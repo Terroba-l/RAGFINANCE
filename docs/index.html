@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nike Adapt">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Nike Adapt</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0a;
+      --card:     #141414;
+      --card2:    #1c1c1e;
+      --border:   #2a2a2a;
+      --text:     #f0f0f0;
+      --muted:    #888;
+      --dim:      #444;
+      --orange:   #fa5400;
+      --green:    #34c759;
+      --yellow:   #ffd60a;
+      --red:      #ff453a;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: 'Inter', -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bot);
+    }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px 10px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.9rem; letter-spacing: 3px; color: #fff;
+    }
+
+    .badge {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 5px 12px;
+      font-size: 0.72rem; color: var(--green);
+    }
+    .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+    /* ── Tab bar ── */
+    nav {
+      display: flex; border-top: 1px solid var(--border);
+      flex-shrink: 0; background: var(--card);
+    }
+    nav button {
+      flex: 1; background: none; border: none; color: var(--dim);
+      padding: 10px 0 calc(10px + var(--safe-bot, 0px));
+      font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      cursor: pointer; transition: color .15s;
+    }
+    nav button span.icon { font-size: 1.25rem; }
+    nav button.active { color: var(--orange); }
+
+    /* ── Panels ── */
+    .panels { flex: 1; overflow-y: auto; overflow-x: hidden; }
+    .panel { display: none; padding: 0 16px 24px; }
+    .panel.active { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 16px 18px; margin-bottom: 12px;
+    }
+
+    .section-label {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 3px;
+      color: var(--dim); margin-bottom: 12px;
+    }
+
+    /* ── Shoe card ── */
+    .shoe-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .shoe-side { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 3px; color: var(--muted); }
+    .shoe-model { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: #fff; margin-top: 2px; }
+    .fit-big {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 5rem; line-height: 1; color: #fff;
+      text-align: center; margin: 8px 0 2px;
+    }
+    .fit-big sup { font-size: 1.8rem; vertical-align: super; }
+    .fit-sub { font-size: 0.65rem; color: var(--dim); text-align: center; letter-spacing: 2px; }
+    .batt-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+    .batt-bar { flex: 1; height: 4px; background: #2a2a2a; border-radius: 2px; overflow: hidden; }
+    .batt-fill { height: 100%; border-radius: 2px; transition: width .4s ease; }
+    .batt-pct { font-size: 0.7rem; min-width: 32px; text-align: right; }
+
+    /* ── Slider ── */
+    .slider-wrap { margin-top: 14px; }
+    .slider-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 6px; }
+    input[type=range] {
+      -webkit-appearance: none; width: 100%; height: 4px;
+      background: var(--border); border-radius: 2px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 22px; height: 22px;
+      border-radius: 50%; background: var(--orange);
+      box-shadow: 0 0 0 3px #fa540022;
+      cursor: pointer;
+    }
+
+    /* ── Mode buttons ── */
+    .mode-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+    .mode-btn {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 10px 4px; text-align: center;
+      cursor: pointer; transition: all .15s ease; user-select: none;
+    }
+    .mode-btn.active { background: #fff; border-color: #fff; color: #000; }
+    .mode-btn .m-icon { font-size: 1.2rem; }
+    .mode-btn .m-name { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+    /* ── Buttons ── */
+    .btn {
+      border: none; border-radius: 30px; padding: 13px 20px;
+      font-weight: 600; font-size: 0.85rem; letter-spacing: 0.5px;
+      cursor: pointer; transition: opacity .15s; width: 100%;
+    }
+    .btn:active { opacity: .75; }
+    .btn-primary { background: var(--orange); color: #fff; }
+    .btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+
+    /* ── LED swatches ── */
+    .swatches { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .swatch-item {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      cursor: pointer;
+    }
+    .swatch-circle {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 2px solid transparent; transition: all .15s ease;
+    }
+    .swatch-item.active .swatch-circle { border-color: #fff; transform: scale(1.12); }
+    .swatch-name { font-size: 0.6rem; color: var(--muted); text-align: center; letter-spacing: 0.5px; }
+
+    .led-preview {
+      text-align: center; padding: 24px 0 16px;
+    }
+    .led-orb {
+      width: 90px; height: 90px; border-radius: 50%;
+      margin: 0 auto; transition: background .4s ease, box-shadow .4s ease;
+    }
+    .led-preview-label { font-size: 0.65rem; color: var(--dim); margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; }
+
+    /* ── Info table ── */
+    .info-table { width: 100%; border-collapse: collapse; }
+    .info-table tr td { padding: 8px 0; font-size: 0.85rem; border-bottom: 1px solid #1a1a1a; }
+    .info-table tr:last-child td { border-bottom: none; }
+    .info-table td:first-child { color: var(--muted); }
+    .info-table td:last-child { text-align: right; }
+
+    .batt-grid { display: grid; grid-template-columns: 1fr 1px 1fr; gap: 0; }
+    .batt-side { text-align: center; padding: 8px 0; }
+    .batt-big { font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; line-height: 1; }
+    .batt-side-label { font-size: 0.65rem; letter-spacing: 3px; color: var(--dim); margin-top: 4px; }
+    .divider-v { background: var(--border); }
+
+    .toast {
+      position: fixed; bottom: calc(80px + var(--safe-bot, 0px)); left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #1c1c1e; border: 1px solid #333; border-radius: 14px;
+      padding: 10px 20px; font-size: 0.82rem; color: #fff;
+      opacity: 0; transition: all .3s ease; pointer-events: none; white-space: nowrap;
+      z-index: 99;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">NIKE ADAPT</div>
+    <div class="badge"><span class="dot"></span> Connected</div>
+  </header>
+
+  <div class="panels">
+
+    <!-- ═══ FIT PANEL ═══ -->
+    <div class="panel active" id="panel-fit">
+      <div style="margin-bottom:12px;">
+        <div class="section-label">Fit Mode</div>
+        <div class="mode-grid">
+          <div class="mode-btn" data-mode="Loose"  onclick="setMode(this)"><div class="m-icon">🌊</div><div class="m-name">Loose</div></div>
+          <div class="mode-btn active" data-mode="Snug" onclick="setMode(this)"><div class="m-icon">👟</div><div class="m-name">Snug</div></div>
+          <div class="mode-btn" data-mode="Sport" onclick="setMode(this)"><div class="m-icon">⚡</div><div class="m-name">Sport</div></div>
+          <div class="mode-btn" data-mode="Lock"  onclick="setMode(this)"><div class="m-icon">🔒</div><div class="m-name">Lock</div></div>
+        </div>
+      </div>
+
+      <!-- Left shoe -->
+      <div class="card">
+        <div class="shoe-header">
+          <div><div class="shoe-side">Left Shoe</div><div class="shoe-model">Nike Adapt BB 2.0</div></div>
+        </div>
+        <div class="fit-big" id="left-pct">72<sup>%</sup></div>
+        <div class="fit-sub">TIGHTNESS</div>
+        <div class="batt-row">
+          <span style="font-size:.75rem;color:#555">🔋</span>
+          <div class="batt-bar"><div class="batt-fill" id="left-batt-fill" style="width:84%;background:var(--green)"></div></div>
+          <span class="batt-pct" id="left-batt-pct" style="color:var(--green)">84%</span>
+        </div>
+        <div class="slider-wrap">
+          <div class="slider-label">Tightness</div>
+          <input type="range" min="0" max="100" value="72" id="sl-left" oninput="updateFit('left',this.value)">
+        </div>
+      </div>
+
+      <!-- Right shoe -->
+      <div class="card">
+        <div class="shoe-header">
+          <div><div class="shoe-side">Right Shoe</div><div class="shoe-model">Nike Adapt BB 2.0</div></div>
+        </div>
+        <div class="fit-big" id="right-pct">72<sup>%</sup></div>
+        <div class="fit-sub">TIGHTNESS</div>
+        <div class="batt-row">
+          <span style="font-size:.75rem;color:#555">🔋</span>
+          <div class="batt-bar"><div class="batt-fill" id="right-batt-fill" style="width:79%;background:var(--green)"></div></div>
+          <span class="batt-pct" id="right-batt-pct" style="color:var(--green)">79%</span>
+        </div>
+        <div class="slider-wrap">
+          <div class="slider-label">Tightness</div>
+          <input type="range" min="0" max="100" value="72" id="sl-right" oninput="updateFit('right',this.value)">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="syncBoth()" style="margin-bottom:10px">⟳ &nbsp;Sync Both Shoes</button>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="adjustAll(-10)">− &nbsp;Loosen All</button>
+        <button class="btn btn-secondary" onclick="adjustAll(+10)">+ &nbsp;Tighten All</button>
+      </div>
+    </div>
+
+    <!-- ═══ LED PANEL ═══ -->
+    <div class="panel" id="panel-led">
+      <div class="led-preview">
+        <div class="led-orb" id="led-orb" style="background:#fa5400;box-shadow:0 0 30px #fa540088,0 0 60px #fa540044"></div>
+        <div class="led-preview-label">LED Preview</div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">Color</div>
+        <div class="swatches" id="swatches">
+          <div class="swatch-item active" data-color="#fa5400" data-name="Nike Orange" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#fa5400"></div>
+            <span class="swatch-name">Nike Orange</span>
+          </div>
+          <div class="swatch-item" data-color="#00c8ff" data-name="Ice Blue" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#00c8ff"></div>
+            <span class="swatch-name">Ice Blue</span>
+          </div>
+          <div class="swatch-item" data-color="#aaff00" data-name="Lime" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#aaff00"></div>
+            <span class="swatch-name">Lime</span>
+          </div>
+          <div class="swatch-item" data-color="#ff2d78" data-name="Hot Pink" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#ff2d78"></div>
+            <span class="swatch-name">Hot Pink</span>
+          </div>
+          <div class="swatch-item" data-color="#ffffff" data-name="Pure White" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#fff;border:1px solid #333"></div>
+            <span class="swatch-name">White</span>
+          </div>
+          <div class="swatch-item" data-color="#222222" data-name="Off" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#222;border:1px solid #444"></div>
+            <span class="swatch-name">Off</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">Brightness</div>
+        <input type="range" min="0" max="100" value="80" id="brightness" oninput="updateBrightness(this.value)">
+        <div style="text-align:right;font-size:.75rem;color:var(--muted);margin-top:4px" id="bright-val">80%</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="flashMode()">⚡ Flash</button>
+        <button class="btn btn-secondary" onclick="pulseMode()">💫 Pulse</button>
+      </div>
+    </div>
+
+    <!-- ═══ INFO PANEL ═══ -->
+    <div class="panel" id="panel-info">
+      <div class="card">
+        <div class="section-label">Device</div>
+        <table class="info-table">
+          <tr><td>Model</td><td>Nike Adapt BB 2.0</td></tr>
+          <tr><td>Firmware</td><td>v3.1.4</td></tr>
+          <tr><td>Connection</td><td style="color:var(--green)">Bluetooth 5.0</td></tr>
+          <tr><td>Last synced</td><td id="last-synced">Just now</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="section-label">Battery</div>
+        <div class="batt-grid">
+          <div class="batt-side">
+            <div class="batt-big" id="info-left-batt" style="color:var(--green)">84%</div>
+            <div class="batt-side-label">LEFT</div>
+          </div>
+          <div class="divider-v"></div>
+          <div class="batt-side">
+            <div class="batt-big" id="info-right-batt" style="color:var(--green)">79%</div>
+            <div class="batt-side-label">RIGHT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-bottom:10px">
+        <button class="btn btn-secondary" onclick="checkUpdate()">🔄 Check Update</button>
+        <button class="btn btn-secondary" onclick="resetShoes()">↺ Reset</button>
+      </div>
+
+      <div style="text-align:center;color:#333;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;margin-top:16px">
+        Nike Adapt · Simulation · 2026
+      </div>
+    </div>
+
+  </div><!-- end panels -->
+
+  <nav>
+    <button class="active" onclick="showTab('fit',this)">
+      <span class="icon">👟</span>FIT
+    </button>
+    <button onclick="showTab('led',this)">
+      <span class="icon">💡</span>LEDS
+    </button>
+    <button onclick="showTab('info',this)">
+      <span class="icon">ℹ️</span>INFO
+    </button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── State ──
+  const state = {
+    left:  { fit: 72, battery: 84 },
+    right: { fit: 72, battery: 79 },
+    led: "#fa5400",
+    brightness: 80,
+  };
+
+  // ── Tabs ──
+  function showTab(name, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── Fit ──
+  function battColor(pct) {
+    if (pct > 50) return 'var(--green)';
+    if (pct > 20) return 'var(--yellow)';
+    return 'var(--red)';
+  }
+
+  function updateFit(side, val) {
+    val = parseInt(val);
+    state[side].fit = val;
+    document.getElementById(side + '-pct').innerHTML = val + '<sup>%</sup>';
+    document.getElementById('sl-' + side).value = val;
+  }
+
+  function adjustAll(delta) {
+    ['left','right'].forEach(s => {
+      const v = Math.max(0, Math.min(100, state[s].fit + delta));
+      updateFit(s, v);
+    });
+  }
+
+  function setMode(el) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    const fits = { Loose: 20, Snug: 65, Sport: 85, Lock: 100 };
+    const v = fits[el.dataset.mode] || 65;
+    updateFit('left', v); updateFit('right', v);
+    toast('Mode: ' + el.dataset.mode);
+  }
+
+  function syncBoth() {
+    const avg = Math.round((state.left.fit + state.right.fit) / 2);
+    updateFit('left', avg); updateFit('right', avg);
+    document.getElementById('last-synced').textContent = 'Just now';
+    toast('✓ Both shoes synced');
+  }
+
+  // ── LEDs ──
+  function setLed(el) {
+    document.querySelectorAll('.swatch-item').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    state.led = el.dataset.color;
+    renderOrb();
+  }
+
+  function renderOrb() {
+    const orb = document.getElementById('led-orb');
+    const c = state.led;
+    const b = state.brightness / 100;
+    if (c === '#222222' || b === 0) {
+      orb.style.background = '#222';
+      orb.style.boxShadow = 'none';
+    } else {
+      orb.style.background = c;
+      const a1 = Math.round(b * 0x88).toString(16).padStart(2,'0');
+      const a2 = Math.round(b * 0x44).toString(16).padStart(2,'0');
+      orb.style.boxShadow = `0 0 30px ${c}${a1}, 0 0 60px ${c}${a2}`;
+    }
+  }
+
+  function updateBrightness(val) {
+    state.brightness = parseInt(val);
+    document.getElementById('bright-val').textContent = val + '%';
+    renderOrb();
+  }
+
+  let flashInterval = null;
+  function flashMode() {
+    if (flashInterval) { clearInterval(flashInterval); flashInterval = null; toast('Flash off'); return; }
+    let on = true;
+    flashInterval = setInterval(() => {
+      const orb = document.getElementById('led-orb');
+      orb.style.opacity = (on = !on) ? '1' : '0.1';
+    }, 200);
+    toast('⚡ Flash mode on');
+  }
+
+  function pulseMode() {
+    const orb = document.getElementById('led-orb');
+    orb.style.transition = 'opacity 0.8s ease-in-out';
+    let growing = false;
+    setInterval(() => {
+      orb.style.opacity = (growing = !growing) ? '1' : '0.2';
+    }, 800);
+    toast('💫 Pulse mode on');
+  }
+
+  // ── Info ──
+  function checkUpdate() {
+    toast('✓ Already up to date (v3.1.4)');
+  }
+  function resetShoes() {
+    updateFit('left', 72); updateFit('right', 72);
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-mode="Snug"]').classList.add('active');
+    toast('↺ Shoes reset to default');
+  }
+
+  // ── Toast ──
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ── Service Worker ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
