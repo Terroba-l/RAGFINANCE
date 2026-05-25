@@ -27,6 +27,7 @@
       --green:    #34c759;
       --yellow:   #ffd60a;
       --red:      #ff453a;
+      --blue:     #0a84ff;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bot: env(safe-area-inset-bottom, 0px);
     }
@@ -38,7 +39,6 @@
       overflow: hidden;
     }
 
-    /* ── Layout ── */
     #app {
       display: flex; flex-direction: column;
       height: 100dvh;
@@ -57,15 +57,24 @@
       font-size: 1.9rem; letter-spacing: 3px; color: #fff;
     }
 
-    .badge {
+    .ble-badge {
       display: flex; align-items: center; gap: 6px;
       background: var(--card); border: 1px solid var(--border);
       border-radius: 20px; padding: 5px 12px;
-      font-size: 0.72rem; color: var(--green);
+      font-size: 0.72rem; cursor: pointer; user-select: none;
+      transition: border-color .15s;
     }
-    .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .ble-badge:active { opacity: .75; }
+    .ble-badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ble-badge.off   { color: var(--muted); }
+    .ble-badge.off .dot { background: var(--dim); }
+    .ble-badge.busy  { color: var(--yellow); }
+    .ble-badge.busy .dot { background: var(--yellow); animation: blink 1s infinite; }
+    .ble-badge.half  { color: var(--yellow); border-color: #5a4a00; }
+    .ble-badge.half .dot { background: var(--yellow); }
+    .ble-badge.on    { color: var(--green); border-color: #0a3a1a; }
+    .ble-badge.on .dot { background: var(--green); }
 
-    /* ── Tab bar ── */
     nav {
       display: flex; border-top: 1px solid var(--border);
       flex-shrink: 0; background: var(--card);
@@ -77,15 +86,13 @@
       display: flex; flex-direction: column; align-items: center; gap: 3px;
       cursor: pointer; transition: color .15s;
     }
-    nav button span.icon { font-size: 1.25rem; }
+    nav button .icon { font-size: 1.25rem; }
     nav button.active { color: var(--orange); }
 
-    /* ── Panels ── */
     .panels { flex: 1; overflow-y: auto; overflow-x: hidden; }
     .panel { display: none; padding: 0 16px 24px; }
     .panel.active { display: block; }
 
-    /* ── Cards ── */
     .card {
       background: var(--card); border: 1px solid var(--border);
       border-radius: 18px; padding: 16px 18px; margin-bottom: 12px;
@@ -96,10 +103,10 @@
       color: var(--dim); margin-bottom: 12px;
     }
 
-    /* ── Shoe card ── */
     .shoe-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .shoe-side { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 3px; color: var(--muted); }
     .shoe-model { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: #fff; margin-top: 2px; }
+
     .fit-big {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 5rem; line-height: 1; color: #fff;
@@ -107,12 +114,12 @@
     }
     .fit-big sup { font-size: 1.8rem; vertical-align: super; }
     .fit-sub { font-size: 0.65rem; color: var(--dim); text-align: center; letter-spacing: 2px; }
+
     .batt-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
     .batt-bar { flex: 1; height: 4px; background: #2a2a2a; border-radius: 2px; overflow: hidden; }
-    .batt-fill { height: 100%; border-radius: 2px; transition: width .4s ease; }
+    .batt-fill { height: 100%; border-radius: 2px; transition: width .4s, background .4s; }
     .batt-pct { font-size: 0.7rem; min-width: 32px; text-align: right; }
 
-    /* ── Slider ── */
     .slider-wrap { margin-top: 14px; }
     .slider-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 6px; }
     input[type=range] {
@@ -122,11 +129,9 @@
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; width: 22px; height: 22px;
       border-radius: 50%; background: var(--orange);
-      box-shadow: 0 0 0 3px #fa540022;
-      cursor: pointer;
+      box-shadow: 0 0 0 3px #fa540022; cursor: pointer;
     }
 
-    /* ── Mode buttons ── */
     .mode-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
     .mode-btn {
       background: var(--card); border: 1px solid var(--border);
@@ -137,127 +142,217 @@
     .mode-btn .m-icon { font-size: 1.2rem; }
     .mode-btn .m-name { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
 
-    /* ── Buttons ── */
     .btn {
       border: none; border-radius: 30px; padding: 13px 20px;
       font-weight: 600; font-size: 0.85rem; letter-spacing: 0.5px;
       cursor: pointer; transition: opacity .15s; width: 100%;
     }
     .btn:active { opacity: .75; }
-    .btn-primary { background: var(--orange); color: #fff; }
+    .btn:disabled { opacity: .4; cursor: default; }
+    .btn-primary   { background: var(--orange); color: #fff; }
     .btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: 9px 16px; font-size: 0.78rem; }
     .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 
-    /* ── LED swatches ── */
     .swatches { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
-    .swatch-item {
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-      cursor: pointer;
-    }
+    .swatch-item { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
     .swatch-circle {
       width: 52px; height: 52px; border-radius: 50%;
       border: 2px solid transparent; transition: all .15s ease;
     }
     .swatch-item.active .swatch-circle { border-color: #fff; transform: scale(1.12); }
-    .swatch-name { font-size: 0.6rem; color: var(--muted); text-align: center; letter-spacing: 0.5px; }
+    .swatch-name { font-size: 0.6rem; color: var(--muted); text-align: center; }
 
-    .led-preview {
-      text-align: center; padding: 24px 0 16px;
-    }
+    .led-preview { text-align: center; padding: 24px 0 16px; }
     .led-orb {
       width: 90px; height: 90px; border-radius: 50%;
-      margin: 0 auto; transition: background .4s ease, box-shadow .4s ease;
+      margin: 0 auto; transition: background .4s, box-shadow .4s;
     }
     .led-preview-label { font-size: 0.65rem; color: var(--dim); margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; }
 
-    /* ── Info table ── */
     .info-table { width: 100%; border-collapse: collapse; }
-    .info-table tr td { padding: 8px 0; font-size: 0.85rem; border-bottom: 1px solid #1a1a1a; }
+    .info-table td { padding: 8px 0; font-size: 0.85rem; border-bottom: 1px solid #1a1a1a; }
     .info-table tr:last-child td { border-bottom: none; }
     .info-table td:first-child { color: var(--muted); }
     .info-table td:last-child { text-align: right; }
 
-    .batt-grid { display: grid; grid-template-columns: 1fr 1px 1fr; gap: 0; }
+    .batt-grid { display: grid; grid-template-columns: 1fr 1px 1fr; }
     .batt-side { text-align: center; padding: 8px 0; }
     .batt-big { font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; line-height: 1; }
     .batt-side-label { font-size: 0.65rem; letter-spacing: 3px; color: var(--dim); margin-top: 4px; }
     .divider-v { background: var(--border); }
 
+    /* ── Connect Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.75);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 100; backdrop-filter: blur(6px);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-sheet {
+      background: #111; border: 1px solid #222;
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px calc(20px + var(--safe-bot, 0px));
+      width: 100%; max-width: 500px;
+    }
+    .modal-handle { width: 36px; height: 4px; background: #333; border-radius: 2px; margin: 0 auto 20px; }
+    .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 2px; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+    .scc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .scc {
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 14px 12px; text-align: center;
+      transition: border-color .2s;
+    }
+    .scc.connecting { border-color: var(--yellow); }
+    .scc.connected  { border-color: var(--green); }
+    .scc-side { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 3px; color: var(--dim); }
+    .scc-name { font-size: 0.72rem; color: var(--text); margin: 5px 0; min-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .scc-batt { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem; color: var(--dim); min-height: 36px; line-height: 1; }
+    .scc-btn { margin-top: 10px; }
+
+    .warn-banner {
+      background: #1a1500; border: 1px solid #5a4a00; border-radius: 12px;
+      padding: 10px 14px; font-size: 0.78rem; color: #ffcc44;
+      line-height: 1.5; margin-bottom: 14px;
+    }
+    .warn-banner a { color: #ffcc44; }
+
+    /* ── Settings Panel ── */
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .field-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+    .field-input {
+      background: #080808; border: 1px solid var(--border);
+      border-radius: 10px; padding: 9px 12px;
+      color: var(--text); font-size: 0.78rem; font-family: monospace;
+      outline: none; width: 100%;
+    }
+    .field-input:focus { border-color: var(--orange); }
+    .field-hint { font-size: 0.6rem; color: var(--dim); }
+
+    /* ── BLE Log ── */
+    .ble-log {
+      background: #050505; border: 1px solid #181818;
+      border-radius: 12px; padding: 10px 12px;
+      font-family: 'Courier New', monospace; font-size: 0.68rem;
+      max-height: 180px; overflow-y: auto;
+    }
+    .log-line { padding: 1px 0; }
+    .log-line.info { color: #555; }
+    .log-line.tx   { color: #4a9eff; }
+    .log-line.rx   { color: #4aff88; }
+    .log-line.err  { color: var(--red); }
+
+    /* ── Discovery ── */
+    .disc-svc { margin-bottom: 8px; }
+    .disc-svc-uuid { font-family: monospace; font-size: 0.62rem; color: var(--blue); margin-bottom: 3px; }
+    .disc-char {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 8px; background: #0a0a0a; border-radius: 6px; margin-bottom: 2px;
+    }
+    .disc-char-uuid { font-family: monospace; font-size: 0.58rem; color: #aaa; }
+    .disc-char-props { font-size: 0.55rem; color: var(--muted); }
+
+    details summary {
+      cursor: pointer; color: var(--muted); font-size: 0.75rem;
+      padding: 6px 0; user-select: none; list-style: none;
+    }
+    details summary::before { content: '▶ '; font-size: .6rem; }
+    details[open] summary::before { content: '▼ '; }
+    details summary:hover { color: var(--text); }
+
+    .ble-ind { font-size: 0.65rem; line-height: 1; }
+
     .toast {
-      position: fixed; bottom: calc(80px + var(--safe-bot, 0px)); left: 50%; transform: translateX(-50%) translateY(20px);
+      position: fixed; bottom: calc(80px + var(--safe-bot, 0px));
+      left: 50%; transform: translateX(-50%) translateY(20px);
       background: #1c1c1e; border: 1px solid #333; border-radius: 14px;
       padding: 10px 20px; font-size: 0.82rem; color: #fff;
-      opacity: 0; transition: all .3s ease; pointer-events: none; white-space: nowrap;
-      z-index: 99;
+      opacity: 0; transition: all .3s ease; pointer-events: none;
+      white-space: nowrap; z-index: 200;
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid #333; border-top-color: var(--orange);
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    @keyframes spin  { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 <div id="app">
   <header>
     <div class="logo">NIKE ADAPT</div>
-    <div class="badge"><span class="dot"></span> Connected</div>
+    <div id="ble-badge" class="ble-badge off" onclick="openModal()">
+      <span class="dot"></span>
+      <span id="ble-badge-txt">Connecter</span>
+    </div>
   </header>
 
   <div class="panels">
 
-    <!-- ═══ FIT PANEL ═══ -->
+    <!-- ═══ FIT ═══ -->
     <div class="panel active" id="panel-fit">
-      <div style="margin-bottom:12px;">
+      <div style="margin-bottom:12px">
         <div class="section-label">Fit Mode</div>
         <div class="mode-grid">
-          <div class="mode-btn" data-mode="Loose"  onclick="setMode(this)"><div class="m-icon">🌊</div><div class="m-name">Loose</div></div>
-          <div class="mode-btn active" data-mode="Snug" onclick="setMode(this)"><div class="m-icon">👟</div><div class="m-name">Snug</div></div>
-          <div class="mode-btn" data-mode="Sport" onclick="setMode(this)"><div class="m-icon">⚡</div><div class="m-name">Sport</div></div>
-          <div class="mode-btn" data-mode="Lock"  onclick="setMode(this)"><div class="m-icon">🔒</div><div class="m-name">Lock</div></div>
+          <div class="mode-btn" data-mode="Loose" data-val="20"  onclick="setMode(this)"><div class="m-icon">🌊</div><div class="m-name">Loose</div></div>
+          <div class="mode-btn active" data-mode="Snug" data-val="65" onclick="setMode(this)"><div class="m-icon">👟</div><div class="m-name">Snug</div></div>
+          <div class="mode-btn" data-mode="Sport" data-val="85"  onclick="setMode(this)"><div class="m-icon">⚡</div><div class="m-name">Sport</div></div>
+          <div class="mode-btn" data-mode="Lock"  data-val="100" onclick="setMode(this)"><div class="m-icon">🔒</div><div class="m-name">Lock</div></div>
         </div>
       </div>
 
-      <!-- Left shoe -->
       <div class="card">
         <div class="shoe-header">
           <div><div class="shoe-side">Left Shoe</div><div class="shoe-model">Nike Adapt BB 2.0</div></div>
+          <div id="ind-left" class="ble-ind" style="color:var(--dim)" title="BLE déconnecté">●</div>
         </div>
-        <div class="fit-big" id="left-pct">72<sup>%</sup></div>
+        <div class="fit-big" id="left-pct">65<sup>%</sup></div>
         <div class="fit-sub">TIGHTNESS</div>
         <div class="batt-row">
-          <span style="font-size:.75rem;color:#555">🔋</span>
-          <div class="batt-bar"><div class="batt-fill" id="left-batt-fill" style="width:84%;background:var(--green)"></div></div>
-          <span class="batt-pct" id="left-batt-pct" style="color:var(--green)">84%</span>
+          <span style="font-size:.75rem;color:#444">🔋</span>
+          <div class="batt-bar"><div class="batt-fill" id="left-bfill" style="width:0%;background:var(--dim)"></div></div>
+          <span class="batt-pct" id="left-bpct" style="color:var(--dim)">--%</span>
         </div>
         <div class="slider-wrap">
-          <div class="slider-label">Tightness</div>
-          <input type="range" min="0" max="100" value="72" id="sl-left" oninput="updateFit('left',this.value)">
+          <div class="slider-label">Serrage</div>
+          <input type="range" min="0" max="100" value="65" id="sl-left" oninput="updateFit('left',+this.value)">
         </div>
       </div>
 
-      <!-- Right shoe -->
       <div class="card">
         <div class="shoe-header">
           <div><div class="shoe-side">Right Shoe</div><div class="shoe-model">Nike Adapt BB 2.0</div></div>
+          <div id="ind-right" class="ble-ind" style="color:var(--dim)" title="BLE déconnecté">●</div>
         </div>
-        <div class="fit-big" id="right-pct">72<sup>%</sup></div>
+        <div class="fit-big" id="right-pct">65<sup>%</sup></div>
         <div class="fit-sub">TIGHTNESS</div>
         <div class="batt-row">
-          <span style="font-size:.75rem;color:#555">🔋</span>
-          <div class="batt-bar"><div class="batt-fill" id="right-batt-fill" style="width:79%;background:var(--green)"></div></div>
-          <span class="batt-pct" id="right-batt-pct" style="color:var(--green)">79%</span>
+          <span style="font-size:.75rem;color:#444">🔋</span>
+          <div class="batt-bar"><div class="batt-fill" id="right-bfill" style="width:0%;background:var(--dim)"></div></div>
+          <span class="batt-pct" id="right-bpct" style="color:var(--dim)">--%</span>
         </div>
         <div class="slider-wrap">
-          <div class="slider-label">Tightness</div>
-          <input type="range" min="0" max="100" value="72" id="sl-right" oninput="updateFit('right',this.value)">
+          <div class="slider-label">Serrage</div>
+          <input type="range" min="0" max="100" value="65" id="sl-right" oninput="updateFit('right',+this.value)">
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="syncBoth()" style="margin-bottom:10px">⟳ &nbsp;Sync Both Shoes</button>
+      <button class="btn btn-primary" onclick="syncBoth()" style="margin-bottom:10px">⟳ &nbsp;Sync les deux</button>
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="adjustAll(-10)">− &nbsp;Loosen All</button>
-        <button class="btn btn-secondary" onclick="adjustAll(+10)">+ &nbsp;Tighten All</button>
+        <button class="btn btn-secondary" onclick="adjustAll(-10)">− &nbsp;Desserrer</button>
+        <button class="btn btn-secondary" onclick="adjustAll(+10)">+ &nbsp;Serrer</button>
       </div>
     </div>
 
-    <!-- ═══ LED PANEL ═══ -->
+    <!-- ═══ LED ═══ -->
     <div class="panel" id="panel-led">
       <div class="led-preview">
         <div class="led-orb" id="led-orb" style="background:#fa5400;box-shadow:0 0 30px #fa540088,0 0 60px #fa540044"></div>
@@ -265,38 +360,38 @@
       </div>
 
       <div class="card">
-        <div class="section-label">Color</div>
-        <div class="swatches" id="swatches">
-          <div class="swatch-item active" data-color="#fa5400" data-name="Nike Orange" onclick="setLed(this)">
+        <div class="section-label">Couleur</div>
+        <div class="swatches">
+          <div class="swatch-item active" data-color="#fa5400" onclick="setLed(this)">
             <div class="swatch-circle" style="background:#fa5400"></div>
             <span class="swatch-name">Nike Orange</span>
           </div>
-          <div class="swatch-item" data-color="#00c8ff" data-name="Ice Blue" onclick="setLed(this)">
+          <div class="swatch-item" data-color="#00c8ff" onclick="setLed(this)">
             <div class="swatch-circle" style="background:#00c8ff"></div>
             <span class="swatch-name">Ice Blue</span>
           </div>
-          <div class="swatch-item" data-color="#aaff00" data-name="Lime" onclick="setLed(this)">
+          <div class="swatch-item" data-color="#aaff00" onclick="setLed(this)">
             <div class="swatch-circle" style="background:#aaff00"></div>
             <span class="swatch-name">Lime</span>
           </div>
-          <div class="swatch-item" data-color="#ff2d78" data-name="Hot Pink" onclick="setLed(this)">
+          <div class="swatch-item" data-color="#ff2d78" onclick="setLed(this)">
             <div class="swatch-circle" style="background:#ff2d78"></div>
             <span class="swatch-name">Hot Pink</span>
           </div>
-          <div class="swatch-item" data-color="#ffffff" data-name="Pure White" onclick="setLed(this)">
+          <div class="swatch-item" data-color="#ffffff" onclick="setLed(this)">
             <div class="swatch-circle" style="background:#fff;border:1px solid #333"></div>
             <span class="swatch-name">White</span>
           </div>
-          <div class="swatch-item" data-color="#222222" data-name="Off" onclick="setLed(this)">
-            <div class="swatch-circle" style="background:#222;border:1px solid #444"></div>
+          <div class="swatch-item" data-color="#000000" onclick="setLed(this)">
+            <div class="swatch-circle" style="background:#111;border:1px solid #444"></div>
             <span class="swatch-name">Off</span>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="section-label">Brightness</div>
-        <input type="range" min="0" max="100" value="80" id="brightness" oninput="updateBrightness(this.value)">
+        <div class="section-label">Luminosité</div>
+        <input type="range" min="0" max="100" value="80" id="brightness" oninput="updateBrightness(+this.value)">
         <div style="text-align:right;font-size:.75rem;color:var(--muted);margin-top:4px" id="bright-val">80%</div>
       </div>
 
@@ -306,186 +401,723 @@
       </div>
     </div>
 
-    <!-- ═══ INFO PANEL ═══ -->
+    <!-- ═══ INFO ═══ -->
     <div class="panel" id="panel-info">
       <div class="card">
-        <div class="section-label">Device</div>
+        <div class="section-label">Appareil</div>
         <table class="info-table">
-          <tr><td>Model</td><td>Nike Adapt BB 2.0</td></tr>
-          <tr><td>Firmware</td><td>v3.1.4</td></tr>
-          <tr><td>Connection</td><td style="color:var(--green)">Bluetooth 5.0</td></tr>
-          <tr><td>Last synced</td><td id="last-synced">Just now</td></tr>
+          <tr><td>Modèle</td><td>Nike Adapt BB 2.0</td></tr>
+          <tr><td>Firmware</td><td id="info-fw">--</td></tr>
+          <tr><td>Connexion</td><td id="info-ble" style="color:var(--dim)">Non connecté</td></tr>
+          <tr><td>Dernier sync</td><td id="info-sync">--</td></tr>
         </table>
       </div>
 
       <div class="card">
-        <div class="section-label">Battery</div>
+        <div class="section-label">Batterie</div>
         <div class="batt-grid">
           <div class="batt-side">
-            <div class="batt-big" id="info-left-batt" style="color:var(--green)">84%</div>
-            <div class="batt-side-label">LEFT</div>
+            <div class="batt-big" id="info-left-b" style="color:var(--dim)">--%</div>
+            <div class="batt-side-label">GAUCHE</div>
           </div>
           <div class="divider-v"></div>
           <div class="batt-side">
-            <div class="batt-big" id="info-right-batt" style="color:var(--green)">79%</div>
-            <div class="batt-side-label">RIGHT</div>
+            <div class="batt-big" id="info-right-b" style="color:var(--dim)">--%</div>
+            <div class="batt-side-label">DROITE</div>
           </div>
         </div>
       </div>
 
-      <div class="btn-row" style="margin-bottom:10px">
-        <button class="btn btn-secondary" onclick="checkUpdate()">🔄 Check Update</button>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="toast('✓ Firmware à jour (v3.1.4)')">🔄 Màj</button>
         <button class="btn btn-secondary" onclick="resetShoes()">↺ Reset</button>
-      </div>
-
-      <div style="text-align:center;color:#333;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;margin-top:16px">
-        Nike Adapt · Simulation · 2026
       </div>
     </div>
 
-  </div><!-- end panels -->
+    <!-- ═══ BLE CONFIG ═══ -->
+    <div class="panel" id="panel-ble">
+
+      <div id="no-ble-banner" class="warn-banner hidden">
+        ⚠️ Web Bluetooth non supporté dans ce navigateur.<br>
+        Utilise <strong>Chrome</strong> sur Android ou Desktop.<br>
+        Sur iPhone : installe <strong>Bluefy</strong> depuis l'App Store.
+      </div>
+
+      <div class="card">
+        <div class="section-label">Protocole BLE</div>
+        <p style="font-size:.72rem;color:var(--muted);margin-bottom:14px;line-height:1.6">
+          Valeurs basées sur la rétro-ingénierie communautaire.
+          Si les commandes ne fonctionnent pas, utilise <strong>nRF Connect</strong> pour identifier les UUID exacts de tes chaussures puis mets-les à jour ici.
+        </p>
+
+        <div class="field">
+          <div class="field-label">Service UUID</div>
+          <input class="field-input" id="cfg-svc" type="text">
+          <div class="field-hint">Service personnalisé Nike Adapt</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Write Characteristic UUID</div>
+          <input class="field-input" id="cfg-wchar" type="text">
+        </div>
+        <div class="field">
+          <div class="field-label">Notify Characteristic UUID</div>
+          <input class="field-input" id="cfg-nchar" type="text">
+        </div>
+
+        <div class="section-label" style="margin-top:4px">Commandes (hex)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="field">
+            <div class="field-label">Serrage (préfixe)</div>
+            <input class="field-input" id="cfg-tight" type="text">
+            <div class="field-hint">valeur 0-255 ajoutée</div>
+          </div>
+          <div class="field">
+            <div class="field-label">LED (préfixe)</div>
+            <input class="field-input" id="cfg-led" type="text">
+            <div class="field-hint">+ R G B ajoutés</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Batterie (requête)</div>
+            <input class="field-input" id="cfg-batt" type="text">
+          </div>
+          <div class="field">
+            <div class="field-label">Délacer</div>
+            <input class="field-input" id="cfg-unlace" type="text">
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:4px">
+          <button class="btn btn-primary btn-sm" onclick="saveProto()">💾 Sauvegarder</button>
+          <button class="btn btn-secondary btn-sm" onclick="resetProto()">↺ Défauts</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">Commande RAW</div>
+        <div style="display:flex;gap:8px">
+          <input class="field-input" id="raw-cmd" type="text" placeholder="Ex: E8 80" style="flex:1">
+          <button class="btn btn-secondary btn-sm" style="width:auto;padding:9px 14px" onclick="sendRaw()">Envoyer</button>
+        </div>
+        <p style="font-size:.62rem;color:var(--dim);margin-top:5px">Envoyé aux deux chaussures connectées</p>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary>Services découverts</summary>
+          <div id="disc-log" style="margin-top:10px">
+            <p style="font-size:.72rem;color:var(--dim)">Connecte une chaussure pour voir ses services BLE.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary>Log BLE</summary>
+          <div class="ble-log" id="ble-log" style="margin-top:10px"></div>
+          <button class="btn btn-secondary btn-sm" onclick="clearLog()" style="margin-top:8px;width:auto;padding:6px 12px">Effacer</button>
+        </details>
+      </div>
+    </div>
+
+  </div><!-- /panels -->
 
   <nav>
-    <button class="active" onclick="showTab('fit',this)">
-      <span class="icon">👟</span>FIT
-    </button>
-    <button onclick="showTab('led',this)">
-      <span class="icon">💡</span>LEDS
-    </button>
-    <button onclick="showTab('info',this)">
-      <span class="icon">ℹ️</span>INFO
-    </button>
+    <button class="active" onclick="showTab('fit',this)">  <span class="icon">👟</span>FIT</button>
+    <button onclick="showTab('led',this)">                  <span class="icon">💡</span>LEDS</button>
+    <button onclick="showTab('info',this)">                 <span class="icon">ℹ️</span>INFO</button>
+    <button onclick="showTab('ble',this)">                  <span class="icon">🔵</span>BLE</button>
   </nav>
+</div>
+
+<!-- Connect Modal -->
+<div class="modal-overlay hidden" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Connexion Bluetooth</div>
+    <div class="modal-sub">
+      Connecte chaque chaussure séparément. Chaque Nike Adapt est un périphérique BLE indépendant.
+    </div>
+
+    <div id="modal-no-ble" class="warn-banner hidden">
+      ⚠️ Web Bluetooth non supporté.<br>
+      Utilise <strong>Chrome</strong> sur Android / Desktop.<br>
+      iPhone : installe l'app <strong>Bluefy</strong> (App Store).
+    </div>
+
+    <div class="scc-grid">
+      <div class="scc" id="scc-left">
+        <div class="scc-side">Gauche</div>
+        <div class="scc-name" id="scc-name-left">—</div>
+        <div class="scc-batt" id="scc-batt-left">—</div>
+        <div class="scc-btn">
+          <button class="btn btn-primary btn-sm" id="scc-btn-left" onclick="connectShoe('left')">Connecter</button>
+        </div>
+      </div>
+      <div class="scc" id="scc-right">
+        <div class="scc-side">Droite</div>
+        <div class="scc-name" id="scc-name-right">—</div>
+        <div class="scc-batt" id="scc-batt-right">—</div>
+        <div class="scc-btn">
+          <button class="btn btn-primary btn-sm" id="scc-btn-right" onclick="connectShoe('right')">Connecter</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  // ── State ──
-  const state = {
-    left:  { fit: 72, battery: 84 },
-    right: { fit: 72, battery: 79 },
-    led: "#fa5400",
-    brightness: 80,
-  };
+// ═══════════════════════════════════════════
+// Protocol defaults (community reverse-engineering)
+// ═══════════════════════════════════════════
+const DEFAULTS = {
+  svcUUID:    '6e3a0001-1000-4000-b000-000000000000',
+  wCharUUID:  '6e3a0003-1000-4000-b000-000000000000',
+  nCharUUID:  '6e3a0002-1000-4000-b000-000000000000',
+  tightenPfx: 'E8',
+  ledPfx:     'E6',
+  battCmd:    'E3',
+  unlaceCmd:  'E9 00',
+};
 
-  // ── Tabs ──
-  function showTab(name, btn) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById('panel-' + name).classList.add('active');
-    btn.classList.add('active');
+let P = { ...DEFAULTS, ...safeJSON(localStorage.getItem('nikeProto')) };
+
+function safeJSON(s) { try { return JSON.parse(s) || {}; } catch { return {}; } }
+
+function saveProto() {
+  P.svcUUID    = v('cfg-svc')    || DEFAULTS.svcUUID;
+  P.wCharUUID  = v('cfg-wchar')  || DEFAULTS.wCharUUID;
+  P.nCharUUID  = v('cfg-nchar')  || DEFAULTS.nCharUUID;
+  P.tightenPfx = v('cfg-tight')  || DEFAULTS.tightenPfx;
+  P.ledPfx     = v('cfg-led')    || DEFAULTS.ledPfx;
+  P.battCmd    = v('cfg-batt')   || DEFAULTS.battCmd;
+  P.unlaceCmd  = v('cfg-unlace') || DEFAULTS.unlaceCmd;
+  localStorage.setItem('nikeProto', JSON.stringify(P));
+  toast('✓ Protocole sauvegardé');
+}
+
+function resetProto() {
+  P = { ...DEFAULTS };
+  localStorage.removeItem('nikeProto');
+  fillSettings();
+  toast('↺ Protocole réinitialisé');
+}
+
+function fillSettings() {
+  set('cfg-svc',    P.svcUUID);
+  set('cfg-wchar',  P.wCharUUID);
+  set('cfg-nchar',  P.nCharUUID);
+  set('cfg-tight',  P.tightenPfx);
+  set('cfg-led',    P.ledPfx);
+  set('cfg-batt',   P.battCmd);
+  set('cfg-unlace', P.unlaceCmd);
+}
+
+// ═══════════════════════════════════════════
+// Hex utils
+// ═══════════════════════════════════════════
+function h2b(hex) {
+  const s = hex.replace(/[^0-9A-Fa-f]/g, '');
+  if (!s) return new Uint8Array(0);
+  return new Uint8Array((s.match(/.{1,2}/g)||[]).map(x => parseInt(x, 16)));
+}
+function b2h(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+}
+
+// ═══════════════════════════════════════════
+// NikeShoe BLE class
+// ═══════════════════════════════════════════
+class NikeShoe {
+  constructor(side) {
+    this.side = side;
+    this.label = side === 'left' ? 'Gauche' : 'Droite';
+    this.device = null;
+    this.server = null;
+    this.wChar = null;   // write characteristic
+    this.nChar = null;   // notify characteristic
+    this.battery = null;
+    this.connected = false;
+    this.services = [];
   }
 
-  // ── Fit ──
-  function battColor(pct) {
-    if (pct > 50) return 'var(--green)';
-    if (pct > 20) return 'var(--yellow)';
-    return 'var(--red)';
-  }
+  async connect() {
+    const uuids = [
+      P.svcUUID, P.wCharUUID, P.nCharUUID,
+      '6e3a0001-1000-4000-b000-000000000000',
+      '6e3a0002-1000-4000-b000-000000000000',
+      '6e3a0003-1000-4000-b000-000000000000',
+    ].filter((x,i,a) => x && a.indexOf(x) === i);
 
-  function updateFit(side, val) {
-    val = parseInt(val);
-    state[side].fit = val;
-    document.getElementById(side + '-pct').innerHTML = val + '<sup>%</sup>';
-    document.getElementById('sl-' + side).value = val;
-  }
-
-  function adjustAll(delta) {
-    ['left','right'].forEach(s => {
-      const v = Math.max(0, Math.min(100, state[s].fit + delta));
-      updateFit(s, v);
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { namePrefix: 'Nike Adapt' },
+        { namePrefix: 'Nike' },
+      ],
+      optionalServices: ['battery_service', 'device_information', ...uuids],
     });
+
+    log('info', `[${this.label}] Appareil: ${this.device.name}`);
+    setCardUI(this.side, 'connecting', this.device.name);
+
+    this.device.addEventListener('gattserverdisconnected', () => this._onDisc());
+    this.server = await this.device.gatt.connect();
+    log('info', `[${this.label}] GATT OK`);
+
+    await this._discover();
+    await this._readBattery();
+    await this._readFirmware();
+
+    this.connected = true;
+    setCardUI(this.side, 'connected', this.device.name);
+    refreshBadge();
+    toast(`✓ ${this.label} connectée: ${this.device.name}`);
   }
 
-  function setMode(el) {
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
-    const fits = { Loose: 20, Snug: 65, Sport: 85, Lock: 100 };
-    const v = fits[el.dataset.mode] || 65;
-    updateFit('left', v); updateFit('right', v);
-    toast('Mode: ' + el.dataset.mode);
+  async _discover() {
+    this.services = [];
+    this.wChar = null;
+    this.nChar = null;
+
+    let svcs;
+    try { svcs = await this.server.getPrimaryServices(); }
+    catch (e) { log('err', `[${this.label}] getPrimaryServices: ${e.message}`); return; }
+
+    for (const svc of svcs) {
+      const info = { uuid: svc.uuid, chars: [] };
+      log('info', `[${this.label}] Svc: ${svc.uuid}`);
+
+      try {
+        const chars = await svc.getCharacteristics();
+        for (const c of chars) {
+          const props = Object.keys(c.properties).filter(k => c.properties[k]);
+          info.chars.push({ uuid: c.uuid, props });
+          log('info', `  └ ${c.uuid} [${props.join(',')}]`);
+
+          const svcMatch  = svc.uuid.toLowerCase() === P.svcUUID.toLowerCase();
+          const wMatch    = c.uuid.toLowerCase()   === P.wCharUUID.toLowerCase();
+          const nMatch    = c.uuid.toLowerCase()   === P.nCharUUID.toLowerCase();
+          const writable  = props.includes('write') || props.includes('writeWithoutResponse');
+          const notifiable = props.includes('notify') || props.includes('indicate');
+
+          if (!this.wChar && writable && (svcMatch || wMatch)) {
+            this.wChar = c;
+            log('tx', `[${this.label}] Write char: ${c.uuid}`);
+          }
+          if (!this.nChar && notifiable && (svcMatch || nMatch)) {
+            this.nChar = c;
+            try {
+              await c.startNotifications();
+              c.addEventListener('characteristicvaluechanged', e => this._onNotify(e));
+              log('rx', `[${this.label}] Notifications ON: ${c.uuid}`);
+            } catch (e) { log('err', `Notif: ${e.message}`); }
+          }
+        }
+      } catch (e) { log('err', `Chars (${svc.uuid}): ${e.message}`); }
+
+      this.services.push(info);
+    }
+
+    renderDiscovery(this.side, this.services);
   }
 
-  function syncBoth() {
-    const avg = Math.round((state.left.fit + state.right.fit) / 2);
-    updateFit('left', avg); updateFit('right', avg);
-    document.getElementById('last-synced').textContent = 'Just now';
-    toast('✓ Both shoes synced');
-  }
+  async _readBattery() {
+    try {
+      const svc  = await this.server.getPrimaryService('battery_service');
+      const char = await svc.getCharacteristic('battery_level');
+      this.battery = (await char.readValue()).getUint8(0);
+      log('rx', `[${this.label}] Batterie: ${this.battery}%`);
+      try {
+        await char.startNotifications();
+        char.addEventListener('characteristicvaluechanged', e => {
+          this.battery = e.target.value.getUint8(0);
+          log('rx', `[${this.label}] Batt update: ${this.battery}%`);
+          updateBattUI(this.side, this.battery);
+        });
+      } catch {}
+      updateBattUI(this.side, this.battery);
+      return;
+    } catch {}
 
-  // ── LEDs ──
-  function setLed(el) {
-    document.querySelectorAll('.swatch-item').forEach(s => s.classList.remove('active'));
-    el.classList.add('active');
-    state.led = el.dataset.color;
-    renderOrb();
-  }
-
-  function renderOrb() {
-    const orb = document.getElementById('led-orb');
-    const c = state.led;
-    const b = state.brightness / 100;
-    if (c === '#222222' || b === 0) {
-      orb.style.background = '#222';
-      orb.style.boxShadow = 'none';
-    } else {
-      orb.style.background = c;
-      const a1 = Math.round(b * 0x88).toString(16).padStart(2,'0');
-      const a2 = Math.round(b * 0x44).toString(16).padStart(2,'0');
-      orb.style.boxShadow = `0 0 30px ${c}${a1}, 0 0 60px ${c}${a2}`;
+    // Fallback: custom battery command
+    if (this.wChar && P.battCmd) {
+      try {
+        await this._write(h2b(P.battCmd));
+        log('tx', `[${this.label}] Batt cmd: ${P.battCmd}`);
+      } catch (e) { log('err', `Batt cmd: ${e.message}`); }
     }
   }
 
-  function updateBrightness(val) {
-    state.brightness = parseInt(val);
-    document.getElementById('bright-val').textContent = val + '%';
-    renderOrb();
+  async _readFirmware() {
+    try {
+      const svc  = await this.server.getPrimaryService('device_information');
+      const char = await svc.getCharacteristic('firmware_revision_string');
+      const fw   = new TextDecoder().decode(await char.readValue());
+      set('info-fw', fw);
+      log('rx', `[${this.label}] Firmware: ${fw}`);
+    } catch {}
   }
 
-  let flashInterval = null;
-  function flashMode() {
-    if (flashInterval) { clearInterval(flashInterval); flashInterval = null; toast('Flash off'); return; }
-    let on = true;
-    flashInterval = setInterval(() => {
-      const orb = document.getElementById('led-orb');
-      orb.style.opacity = (on = !on) ? '1' : '0.1';
-    }, 200);
-    toast('⚡ Flash mode on');
+  async setTightness(val) { // 0-100
+    if (!this.connected || !this.wChar) return false;
+    try {
+      const pfx = h2b(P.tightenPfx);
+      const cmd = new Uint8Array([...pfx, Math.round(val * 255 / 100)]);
+      await this._write(cmd);
+      log('tx', `[${this.label}] Tighten ${val}%: ${b2h(cmd)}`);
+      return true;
+    } catch (e) { log('err', `Tighten: ${e.message}`); return false; }
   }
 
-  function pulseMode() {
-    const orb = document.getElementById('led-orb');
-    orb.style.transition = 'opacity 0.8s ease-in-out';
-    let growing = false;
-    setInterval(() => {
-      orb.style.opacity = (growing = !growing) ? '1' : '0.2';
-    }, 800);
-    toast('💫 Pulse mode on');
+  async setLED(r, g, b) {
+    if (!this.connected || !this.wChar) return false;
+    try {
+      const pfx = h2b(P.ledPfx);
+      const cmd = new Uint8Array([...pfx, r, g, b]);
+      await this._write(cmd);
+      log('tx', `[${this.label}] LED rgb(${r},${g},${b}): ${b2h(cmd)}`);
+      return true;
+    } catch (e) { log('err', `LED: ${e.message}`); return false; }
   }
 
-  // ── Info ──
-  function checkUpdate() {
-    toast('✓ Already up to date (v3.1.4)');
-  }
-  function resetShoes() {
-    updateFit('left', 72); updateFit('right', 72);
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-mode="Snug"]').classList.add('active');
-    toast('↺ Shoes reset to default');
+  async sendRaw(hexStr) {
+    if (!this.connected || !this.wChar) throw new Error(`${this.label} non connectée`);
+    const cmd = h2b(hexStr);
+    await this._write(cmd);
+    log('tx', `[${this.label}] RAW: ${b2h(cmd)}`);
   }
 
-  // ── Toast ──
-  function toast(msg) {
-    const el = document.getElementById('toast');
-    el.textContent = msg; el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 2200);
+  async _write(bytes) {
+    if (this.wChar.properties.writeWithoutResponse) {
+      await this.wChar.writeValueWithoutResponse(bytes);
+    } else {
+      await this.wChar.writeValue(bytes);
+    }
   }
 
-  // ── Service Worker ──
-  if ('serviceWorker' in navigator) {
+  _onNotify(event) {
+    const bytes = new Uint8Array(event.target.value.buffer);
+    log('rx', `[${this.label}] Notify: ${b2h(bytes)}`);
+    // Battery response heuristic
+    if (bytes.length >= 2 && (bytes[0] === 0xE3 || bytes[0] === 0x03)) {
+      this.battery = bytes[1];
+      updateBattUI(this.side, this.battery);
+    }
+  }
+
+  _onDisc() {
+    this.connected = false;
+    this.wChar = null;
+    this.nChar = null;
+    setCardUI(this.side, 'off', null);
+    refreshBadge();
+    updateBattUI(this.side, null);
+    log('info', `[${this.label}] Déconnecté`);
+    toast(`${this.label} déconnectée`);
+  }
+
+  async disconnect() {
+    if (this.device?.gatt?.connected) this.device.gatt.disconnect();
+    this._onDisc();
+  }
+}
+
+// ═══════════════════════════════════════════
+// Global state
+// ═══════════════════════════════════════════
+const shoes = { left: new NikeShoe('left'), right: new NikeShoe('right') };
+const ST = { left: { fit: 65 }, right: { fit: 65 }, led: '#fa5400', brightness: 80 };
+
+// ═══════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════
+function v(id) { return document.getElementById(id)?.value?.trim() || ''; }
+function set(id, val) { const el = document.getElementById(id); if (el) { if ('value' in el && el.tagName !== 'DIV' && el.tagName !== 'SPAN' && el.tagName !== 'TD') el.value = val; else el.textContent = val; } }
+
+function battColor(p) {
+  return p > 50 ? 'var(--green)' : p > 20 ? 'var(--yellow)' : 'var(--red)';
+}
+
+function updateBattUI(side, pct) {
+  const c   = pct != null ? battColor(pct) : 'var(--dim)';
+  const txt = pct != null ? pct + '%'      : '--%';
+  const fill = pct != null ? pct           : 0;
+
+  const bpct  = document.getElementById(side + '-bpct');
+  const bfill = document.getElementById(side + '-bfill');
+  if (bpct)  { bpct.textContent = txt; bpct.style.color = c; }
+  if (bfill) { bfill.style.width = fill + '%'; bfill.style.background = c; }
+
+  const infoEl = document.getElementById('info-' + side + '-b');
+  if (infoEl) { infoEl.textContent = txt; infoEl.style.color = c; }
+
+  const sccEl = document.getElementById('scc-batt-' + side);
+  if (sccEl) { sccEl.textContent = pct != null ? pct + '%' : '—'; sccEl.style.color = pct != null ? c : 'var(--dim)'; }
+}
+
+function setCardUI(side, state, name) {
+  const scc  = document.getElementById('scc-' + side);
+  const nameEl = document.getElementById('scc-name-' + side);
+  const btn  = document.getElementById('scc-btn-' + side);
+  const ind  = document.getElementById('ind-' + side);
+
+  scc.className = 'scc ' + state;
+  nameEl.textContent = name || '—';
+
+  if (state === 'connecting') {
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+  } else if (state === 'connected') {
+    btn.textContent = 'Déconnecter';
+    btn.disabled = false;
+    btn.onclick = () => shoes[side].disconnect();
+    if (ind) { ind.style.color = 'var(--green)'; ind.title = 'BLE connecté'; }
+  } else {
+    btn.textContent = 'Connecter';
+    btn.disabled = false;
+    btn.onclick = () => connectShoe(side);
+    if (ind) { ind.style.color = 'var(--dim)'; ind.title = 'BLE déconnecté'; }
+  }
+}
+
+function refreshBadge() {
+  const l = shoes.left.connected, r = shoes.right.connected;
+  const badge = document.getElementById('ble-badge');
+  const txt   = document.getElementById('ble-badge-txt');
+  const infoEl = document.getElementById('info-ble');
+
+  if (l && r)       { badge.className = 'ble-badge on';   txt.textContent = 'G + D connectés'; }
+  else if (l || r)  { badge.className = 'ble-badge half'; txt.textContent = (l ? 'G' : 'D') + ' connectée'; }
+  else              { badge.className = 'ble-badge off';   txt.textContent = 'Connecter'; }
+
+  if (infoEl) {
+    if (l && r)     { infoEl.textContent = 'Bluetooth 5.0 — G + D'; infoEl.style.color = 'var(--green)'; }
+    else if (l||r)  { infoEl.textContent = 'Bluetooth 5.0 — partiel'; infoEl.style.color = 'var(--yellow)'; }
+    else            { infoEl.textContent = 'Non connecté'; infoEl.style.color = 'var(--dim)'; }
+  }
+}
+
+function renderDiscovery(side, services) {
+  const el = document.getElementById('disc-log');
+  let html = `<p style="font-size:.68rem;color:var(--muted);margin-bottom:8px">
+    Chaussure ${side === 'left' ? 'Gauche' : 'Droite'} — ${services.length} service(s)</p>`;
+
+  for (const svc of services) {
+    html += `<div class="disc-svc"><div class="disc-svc-uuid">${svc.uuid}</div>`;
+    for (const c of svc.chars) {
+      html += `<div class="disc-char">
+        <span class="disc-char-uuid">${c.uuid}</span>
+        <span class="disc-char-props">[${c.props.join(',')}]</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html || '<p style="font-size:.72rem;color:var(--dim)">Aucun service accessible.</p>';
+}
+
+// ═══════════════════════════════════════════
+// Modal
+// ═══════════════════════════════════════════
+function openModal() {
+  document.getElementById('modal').classList.remove('hidden');
+  if (!navigator.bluetooth) {
+    document.getElementById('modal-no-ble').classList.remove('hidden');
+    document.getElementById('scc-btn-left').disabled  = true;
+    document.getElementById('scc-btn-right').disabled = true;
+  }
+}
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+async function connectShoe(side) {
+  if (!navigator.bluetooth) { toast('Web Bluetooth non supporté. Utilise Chrome.'); return; }
+  try {
+    await shoes[side].connect();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      log('err', `Connect ${side}: ${e.message}`);
+      toast(`Erreur: ${e.message}`);
+    }
+    setCardUI(side, 'off', null);
+    refreshBadge();
+  }
+}
+
+// ═══════════════════════════════════════════
+// Log
+// ═══════════════════════════════════════════
+function log(type, msg) {
+  const el = document.getElementById('ble-log');
+  const d  = document.createElement('div');
+  const t  = new Date().toLocaleTimeString('fr-FR', { hour12: false });
+  d.className = `log-line ${type}`;
+  d.textContent = `[${t}] ${msg}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  while (el.children.length > 120) el.removeChild(el.firstChild);
+}
+function clearLog() { document.getElementById('ble-log').innerHTML = ''; }
+
+// ═══════════════════════════════════════════
+// Tabs
+// ═══════════════════════════════════════════
+function showTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// Fit
+// ═══════════════════════════════════════════
+function updateFit(side, val) {
+  val = Math.round(val);
+  ST[side].fit = val;
+  document.getElementById(side + '-pct').innerHTML = val + '<sup>%</sup>';
+  document.getElementById('sl-' + side).value = val;
+  if (shoes[side].connected) shoes[side].setTightness(val);
+  if (shoes.left.connected || shoes.right.connected)
+    document.getElementById('info-sync').textContent = 'À l\'instant';
+}
+
+function adjustAll(delta) {
+  ['left','right'].forEach(s => updateFit(s, Math.max(0, Math.min(100, ST[s].fit + delta))));
+}
+
+function setMode(el) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const v = parseInt(el.dataset.val) || 65;
+  updateFit('left', v); updateFit('right', v);
+  toast('Mode: ' + el.dataset.mode);
+}
+
+function syncBoth() {
+  const avg = Math.round((ST.left.fit + ST.right.fit) / 2);
+  updateFit('left', avg); updateFit('right', avg);
+  document.getElementById('info-sync').textContent = 'À l\'instant';
+  toast('✓ Les deux chaussures synchronisées');
+}
+
+// ═══════════════════════════════════════════
+// LED
+// ═══════════════════════════════════════════
+function hexToRGB(hex) {
+  return {
+    r: parseInt(hex.slice(1,3), 16),
+    g: parseInt(hex.slice(3,5), 16),
+    b: parseInt(hex.slice(5,7), 16),
+  };
+}
+
+function setLed(el) {
+  document.querySelectorAll('.swatch-item').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  ST.led = el.dataset.color;
+  renderOrb(); sendLED();
+}
+
+function renderOrb() {
+  const orb = document.getElementById('led-orb');
+  const c = ST.led, br = ST.brightness / 100;
+  if (c === '#000000' || br === 0) {
+    orb.style.background = '#111'; orb.style.boxShadow = 'none';
+  } else {
+    orb.style.background = c;
+    const a1 = Math.round(br*0x88).toString(16).padStart(2,'0');
+    const a2 = Math.round(br*0x44).toString(16).padStart(2,'0');
+    orb.style.boxShadow = `0 0 30px ${c}${a1}, 0 0 60px ${c}${a2}`;
+  }
+}
+
+function updateBrightness(val) {
+  ST.brightness = val;
+  document.getElementById('bright-val').textContent = val + '%';
+  renderOrb(); sendLED();
+}
+
+function sendLED() {
+  const { r, g, b } = hexToRGB(ST.led);
+  const br = ST.brightness / 100;
+  const R = Math.round(r*br), G = Math.round(g*br), B = Math.round(b*br);
+  if (shoes.left.connected)  shoes.left.setLED(R, G, B);
+  if (shoes.right.connected) shoes.right.setLED(R, G, B);
+}
+
+let flashIv = null;
+function flashMode() {
+  if (flashIv) { clearInterval(flashIv); flashIv = null; toast('Flash off'); return; }
+  let on = true;
+  flashIv = setInterval(() => {
+    document.getElementById('led-orb').style.opacity = (on = !on) ? '1' : '0.05';
+  }, 200);
+  toast('⚡ Flash activé');
+}
+
+function pulseMode() {
+  const orb = document.getElementById('led-orb');
+  orb.style.transition = 'opacity 0.8s ease-in-out';
+  let g = false;
+  setInterval(() => { orb.style.opacity = (g = !g) ? '1' : '0.15'; }, 800);
+  toast('💫 Pulse activé');
+}
+
+// ═══════════════════════════════════════════
+// Reset
+// ═══════════════════════════════════════════
+function resetShoes() {
+  updateFit('left', 65); updateFit('right', 65);
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-mode="Snug"]').classList.add('active');
+  toast('↺ Reset effectué');
+}
+
+// ═══════════════════════════════════════════
+// Raw command
+// ═══════════════════════════════════════════
+async function sendRaw() {
+  const hex = v('raw-cmd');
+  if (!hex) { toast('Entrez une commande hex'); return; }
+  let sent = false;
+  try {
+    if (shoes.left.connected)  { await shoes.left.sendRaw(hex);  sent = true; }
+    if (shoes.right.connected) { await shoes.right.sendRaw(hex); sent = true; }
+    if (!sent) toast('Aucune chaussure connectée');
+    else toast(`✓ Envoyé: ${hex}`);
+  } catch (e) { toast(`Erreur: ${e.message}`); }
+}
+
+// ═══════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════
+let _tt = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  if (_tt) clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
+function init() {
+  fillSettings();
+  if (!navigator.bluetooth) {
+    document.getElementById('no-ble-banner').classList.remove('hidden');
+    log('err', 'Web Bluetooth non supporté');
+  } else {
+    log('info', 'Web Bluetooth disponible ✓');
+    log('info', 'Protocole chargé: ' + P.svcUUID);
+  }
+  if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
+}
+
+init();
 </script>
 </body>
 </html>
