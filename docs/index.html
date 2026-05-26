@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v33</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v34</span>
       </div>
     </div>
 
@@ -701,8 +701,8 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:8px">
         <button class="cbtn" style="background:#c0392b" onclick="resetProbeIdx()">↺ Reset #10</button>
-        <button class="cbtn" style="background:#8e44ad" onclick="jumpToProbe(25)">⚡ Crypto #25</button>
-        <button class="cbtn" style="background:#16a085" onclick="jumpToProbe(40)">⚡ FE #40</button>
+        <button class="cbtn" style="background:#8e44ad" onclick="jumpToProbe(54)">⚡ ECB #54</button>
+        <button class="cbtn" style="background:#16a085" onclick="jumpToProbe(61)">⚡ DEF #61</button>
         <button class="cbtn" style="background:#7f8c8d" onclick="hardReload()">⟳ Hard Reload SW</button>
       </div>
     </div>
@@ -873,11 +873,38 @@ function resetProto() {
 // BLE Shoe class
 // ════════════════════════════════════
 // ════════════════════════════════════
+// ════════════════════════════════════
+// Crypto helpers
+// ════════════════════════════════════
+
+// DEFAULT_KEY candidates from Bigfoot.framework binary offset 0xC11C0 / 0xC11D0
+const DEFAULT_KEY_1 = new Uint8Array([0xd9,0xa2,0xc4,0x17,0x1a,0x01,0x94,0xed,0x8f,0x1e,0x11,0xb3,0xd7,0x09,0x0c,0xb6]);
+const DEFAULT_KEY_2 = new Uint8Array([0xe9,0x10,0x6f,0x22,0xee,0x13,0xca,0xb3,0x07,0x05,0x76,0xc9,0xfa,0x31,0x6c,0x08]);
+
+// AES-ECB = AES-CBC(IV=0) on a single 16-byte block (WebCrypto doesn't expose ECB directly)
+async function aesEcb(key, block16) {
+  const ck = await crypto.subtle.importKey('raw', key, {name:'AES-CBC'}, false, ['encrypt']);
+  const ct = await crypto.subtle.encrypt({name:'AES-CBC', iv: new Uint8Array(16)}, ck, block16);
+  return new Uint8Array(ct).slice(0, 16);
+}
+
+// DH Group 2 (RFC 2409, 1024-bit MODP)
+const DH2_P = BigInt('0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF');
+const DH2_G = 2n;
+const DH_KEY_LEN = 128; // bytes for 1024-bit group
+
+function modPow(b, e, m) { let r=1n; b%=m; for(;e>0n;e>>=1n,b=b*b%m) if(e&1n) r=r*b%m; return r; }
+function bn2bytes(n, len) { const h=n.toString(16).padStart(len*2,'0'); return new Uint8Array(h.match(/../g).map(x=>parseInt(x,16))); }
+function bytes2bn(b) { return BigInt('0x'+Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('')); }
+
 // Auth probe sequences (one per connection attempt)
 // ════════════════════════════════════
-// Step 2 probes — shoe responds C0 xx to step1, we must respond correctly
-// C0 xx responses always get C0 02 → trying non-C0 formats now
-// Tried: C0 01(echo)=FAIL, C0 91(XOR)=FAIL, C0 90(k[0])=FAIL
+// Binary analysis: auth uses AES-128-ECB (not CBC) + DH group2 key exchange
+// _encrypt_nonce = AES_ECB(key, nonce_block); secretKey derived from DH or DEFAULT_KEY
+// Step 1: 01 10 + authKey triggers shoe → shoe responds C0 01 (StartAuthKeyGen, modGroup)
+// Step 2: phone must send DH pubkey or ECB-encrypted nonce with correct key
+// Probes 0-53: FE/C0/E8 namespace → all NACK (FE02/E802)
+// Probes 54+: opcode 01 + AES-ECB + DEFAULT_KEY candidates + DH Group2
 let step2ProbeIndex = Math.max(10, parseInt(localStorage.getItem('step2ProbeIdx') ?? '10', 10));
 const STEP2_PROBES = [
   { label: 'écho C0+c [FAIL]',       fn: (k,c) => new Uint8Array([0xC0, c]) },
@@ -1018,6 +1045,55 @@ const STEP2_PROBES = [
   { label: 'FE 04 + key',             fn: (k,c) => new Uint8Array([0xFE,0x04,...k]) },
   { label: 'FE 11 + key',             fn: (k,c) => new Uint8Array([0xFE,0x11,...k]) },
   { label: 'FE 01 zeros(16)',         fn: (k,c) => new Uint8Array([0xFE,0x01,...new Uint8Array(16)]) },
+  // ── Batch 7 : AES-ECB opcode 01 (bonne crypto, bon opcode) ──────────────
+  // Binary analysis: _encrypt_nonce = AES_ECB(key, block); nonce format = [0x00*4 + phoneNonce(12)]
+  { label: '01 10 ECB(key,zeros)',    fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(k,new Uint8Array(16))]) },
+  { label: '01 10 ECB(key,[c,0*15])',  fn: async (k,c) => { const b=new Uint8Array(16);b[0]=c; return new Uint8Array([0x01,0x10,...await aesEcb(k,b)]); } },
+  { label: '01 10 ECB(key,[0*4+rnd])', fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0x01,0x10,...await aesEcb(k,n)]); } },
+  { label: '01 10 ECB(key,[0*4+c*12])',fn: async (k,c) => { const n=new Uint8Array(16);n.fill(c,4); return new Uint8Array([0x01,0x10,...await aesEcb(k,n)]); } },
+  { label: '01 10 ECB(key,key)',      fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(k,k)]) },
+  { label: '02 10 ECB(key,zeros)',    fn: async (k,c) => new Uint8Array([0x02,0x10,...await aesEcb(k,new Uint8Array(16))]) },
+  { label: '02 10 ECB(key,[0*4+rnd])',fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0x02,0x10,...await aesEcb(k,n)]); } },
+  // ── Batch 8 : DEFAULT_KEY_1 (Bigfoot binary 0xC11C0) ────────────────────
+  { label: 'DEF1 01 ECB zeros',       fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_1,new Uint8Array(16))]) },
+  { label: 'DEF1 01 ECB [0*4+rnd]',  fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_1,n)]); } },
+  { label: 'DEF1 01 ECB [c,0*15]',   fn: async (k,c) => { const b=new Uint8Array(16);b[0]=c; return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_1,b)]); } },
+  { label: 'DEF1 01 ECB [0*4+c*12]', fn: async (k,c) => { const n=new Uint8Array(16);n.fill(c,4); return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_1,n)]); } },
+  { label: 'DEF1 FE ECB [0*4+rnd]',  fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0xFE,0x01,...await aesEcb(DEFAULT_KEY_1,n)]); } },
+  // ── Batch 9 : DEFAULT_KEY_2 (Bigfoot binary 0xC11D0) ────────────────────
+  { label: 'DEF2 01 ECB zeros',       fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_2,new Uint8Array(16))]) },
+  { label: 'DEF2 01 ECB [0*4+rnd]',  fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_2,n)]); } },
+  { label: 'DEF2 01 ECB [c,0*15]',   fn: async (k,c) => { const b=new Uint8Array(16);b[0]=c; return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_2,b)]); } },
+  { label: 'DEF2 01 ECB [0*4+c*12]', fn: async (k,c) => { const n=new Uint8Array(16);n.fill(c,4); return new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_2,n)]); } },
+  { label: 'DEF2 FE ECB [0*4+rnd]',  fn: async (k,c) => { const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4)); return new Uint8Array([0xFE,0x01,...await aesEcb(DEFAULT_KEY_2,n)]); } },
+  // ── Batch 10 : DH Group2 public key (BigInt, 128 bytes) ─────────────────
+  // Shoe sends C0 01 = StartAuthKeyGen modGroup=TWO (1024-bit). We must respond with our DH pubkey.
+  { label: 'DH2 pubkey op01',        fn: async (k,c) => {
+      log('info','[DH] Generating DH Group2 key pair...');
+      const privBn = bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pubBn  = modPow(DH2_G, privBn, DH2_P);
+      const pub    = bn2bytes(pubBn, DH_KEY_LEN);
+      window._dhPrivKey = privBn; window._dhPubKey = pub;
+      log('info',`[DH] pubKey[0..3]: ${b2h(pub.slice(0,4))}...`);
+      // Format: opcode 01 + length 0x80 (128) + pubkey bytes
+      return new Uint8Array([0x01, DH_KEY_LEN, ...pub]);
+  }},
+  { label: 'DH2 pubkey op02',        fn: async (k,c) => {
+      const privBn = bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pubBn  = modPow(DH2_G, privBn, DH2_P);
+      const pub    = bn2bytes(pubBn, DH_KEY_LEN);
+      window._dhPrivKey = privBn; window._dhPubKey = pub;
+      return new Uint8Array([0x02, DH_KEY_LEN, ...pub]);
+  }},
+  { label: 'DH2 pubkey+ECBnonce',    fn: async (k,c) => {
+      // Full flow: DH pubkey in step2, and if shoe replies with its pubkey we compute secret+nonce
+      const privBn = bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pubBn  = modPow(DH2_G, privBn, DH2_P);
+      const pub    = bn2bytes(pubBn, DH_KEY_LEN);
+      window._dhPrivKey = privBn; window._dhPubKey = pub;
+      log('info',`[DH] Full exchange attempt — pubkey[0..3]: ${b2h(pub.slice(0,4))}...`);
+      return new Uint8Array([0x01, DH_KEY_LEN, ...pub]);
+  }},
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1105,21 +1181,36 @@ class NikeShoe {
     this._authOK = false;
     this._challengeResolve = null;
 
-    // Step1 initial
+    // Step1 initial — triggers shoe to respond with C0 xx (StartAuthKeyGen)
     const step1 = new Uint8Array([0x01, 0x10, ...h2b(SHOE_DATA[this.side].authKey)]);
     log('tx', `[${this.label}] Auth step1 → ${b2h(step1)}`);
     try { await this._write(step1); } catch(e) { log('err', `Auth: ${e.message}`); return; }
 
-    // Boucle : le shoe envoie C0 01 toutes les ~3s → on enchaîne les probes
+    // Boucle : le shoe envoie C0 xx (StartAuthKeyGen) → on tente un probe
+    // _challengeResolve se déclenche sur TOUTE notification pour voir la réponse du shoe
     while (this.device?.gatt?.connected && !this._authOK) {
-      const challenge = await Promise.race([
+      const notif = await Promise.race([
         new Promise(r => { this._challengeResolve = r; }),
-        sleep(5000).then(() => null),
+        sleep(6000).then(() => null),
       ]);
       this._challengeResolve = null;
 
-      if (challenge === null || !this.device?.gatt?.connected) break;
+      if (notif === null || !this.device?.gatt?.connected) break;
 
+      const { opcode, second, data } = notif;
+      const opcHex = opcode.toString(16).padStart(2,'0').toUpperCase();
+
+      // AUTH OK on FE 00
+      if (opcode === 0xFE && second === 0x00) { this._authOK = true; break; }
+
+      // Only run probes when shoe sends C0 xx (StartAuthKeyGen / periodic status)
+      // Other notifications (FE 02 NACK, E8 02, etc.) are already logged — skip probe
+      if (opcode !== 0xC0) {
+        log('info', `[${this.label}] Notif ${opcHex} ${second.toString(16).padStart(2,'0').toUpperCase()} (${data.length}B) — pas C0, skip probe`);
+        continue;
+      }
+
+      const challenge = second;
       log('rx', `[${this.label}] Challenge: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
 
       const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
@@ -1140,7 +1231,7 @@ class NikeShoe {
         log('info', `[${this.label}] Step2: aucun envoi, attente 15s...`);
         await sleep(15000);
       }
-      // else: undefined (fn threw) → loop continue, attend le prochain C0 01
+      // else: undefined (fn threw) → loop continue, attend le prochain C0 xx
     }
   }
 
@@ -1228,14 +1319,17 @@ class NikeShoe {
     const ascii = Array.from(b).map(x=>x>=32&&x<127?String.fromCharCode(x):'.').join('');
     log('rx',`[${this.label}] ← ${b2h(b)}  "${ascii}"`);
 
+    // Resolve auth challenge promise on ANY notification (not just C0)
+    // This lets us detect what the shoe sends after opcode-01 probes
+    if (this._challengeResolve) {
+      this._challengeResolve({ opcode: b[0], second: b[1], data: b });
+      this._challengeResolve = null;
+    }
+
     if (b[0] === 0xC0) {
       this._currentFit = b[1];
-      if (this._challengeResolve) {
-        // Résoudre la promesse du challenge auth
-        this._challengeResolve(b[1]);
-        this._challengeResolve = null;
-      } else if (!this._authOK) {
-        log('rx', `[${this.label}] C0 ${b[1]} (pas encore auth OK)`);
+      if (!this._authOK) {
+        // handled by _challengeResolve above
       } else {
         log('rx', `[${this.label}] C0 keepalive — position: ${b[1]}`);
       }
@@ -1575,7 +1669,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v33 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v34 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
