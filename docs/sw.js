@@ -1,4 +1,4 @@
-const CACHE = "nike-adapt-v23";
+const CACHE = "nike-adapt-v24";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
