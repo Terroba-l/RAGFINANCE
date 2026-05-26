@@ -1457,8 +1457,8 @@ function init() {
   } else {
     log('info','Web Bluetooth disponible ✓');
     log('info',`Chaussures: ${SHOE_DATA.left.name} (${SHOE_DATA.left.colorway})`);
-    log('info',`Gauche  discoveryKey: ${SHOE_DATA.left.discoveryKey}  max: ${maxL}%`);
-    log('info',`Droite  discoveryKey: ${SHOE_DATA.right.discoveryKey}  max: ${maxR}%`);
+    log('info',`Gauche  max: ${maxL}%  authKey: ${SHOE_DATA.left.authKey.slice(0,6)}…`);
+    log('info',`Droite  max: ${maxR}%  authKey: ${SHOE_DATA.right.authKey.slice(0,6)}…`);
   }
 
   if ('serviceWorker' in navigator) {
