@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v25</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v26</span>
       </div>
     </div>
 
@@ -699,8 +699,9 @@
         <button class="cbtn cbtn-sec" onclick="manualProbe('FE 00')">FE 00 + key</button>
         <button class="cbtn cbtn-sec" onclick="manualProbe('FE 10')">FE 10 + key</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
-        <button class="cbtn" style="background:#c0392b" onclick="resetProbeIdx()">↺ Reset probe #3</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px">
+        <button class="cbtn" style="background:#c0392b" onclick="resetProbeIdx()">↺ Reset #10</button>
+        <button class="cbtn" style="background:#8e44ad" onclick="jumpToProbe(25)">⚡ Crypto #25</button>
         <button class="cbtn" style="background:#7f8c8d" onclick="hardReload()">⟳ Hard Reload SW</button>
       </div>
     </div>
@@ -1423,10 +1424,17 @@ function updateProbeStatus() {
 }
 
 function resetProbeIdx() {
-  step2ProbeIndex = 3;
-  localStorage.setItem('step2ProbeIdx', 3);
+  step2ProbeIndex = 10;
+  localStorage.setItem('step2ProbeIdx', 10);
   updateProbeStatus();
-  log('info', 'Probe index réinitialisé à #3');
+  log('info', 'Probe index réinitialisé à #10');
+}
+
+function jumpToProbe(n) {
+  step2ProbeIndex = n;
+  localStorage.setItem('step2ProbeIdx', n);
+  updateProbeStatus();
+  log('info', `⚡ Probe index → #${n}: "${STEP2_PROBES[n % STEP2_PROBES.length].label}"`);
 }
 
 
@@ -1519,7 +1527,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v25 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v26 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
