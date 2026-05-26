@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v32</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v33</span>
       </div>
     </div>
 
@@ -1003,6 +1003,21 @@ const STEP2_PROBES = [
       const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,k);
       return new Uint8Array([0xFE,0x01,...new Uint8Array(ct).slice(0,16)]);
   }},
+  // Batch 6 : FE variants sans challenge + sous-commandes alternatives
+  { label: 'FE 01 key^(c*16)',        fn: (k,c) => new Uint8Array([0xFE,0x01,...k.map(b=>b^c)]) },
+  { label: 'FE 01 SHA256(key)[:16]',  fn: async (k,c) => {
+      const h = await crypto.subtle.digest('SHA-256',k);
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(h).slice(0,16)]);
+  }},
+  { label: 'FE 01 HMAC(key,key)[:16]',fn: async (k,c) => {
+      const hk = await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const sig = await crypto.subtle.sign('HMAC',hk,k);
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(sig).slice(0,16)]);
+  }},
+  { label: 'FE 03 + key',             fn: (k,c) => new Uint8Array([0xFE,0x03,...k]) },
+  { label: 'FE 04 + key',             fn: (k,c) => new Uint8Array([0xFE,0x04,...k]) },
+  { label: 'FE 11 + key',             fn: (k,c) => new Uint8Array([0xFE,0x11,...k]) },
+  { label: 'FE 01 zeros(16)',         fn: (k,c) => new Uint8Array([0xFE,0x01,...new Uint8Array(16)]) },
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1560,7 +1575,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v32 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v33 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
