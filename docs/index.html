@@ -648,17 +648,6 @@
     <div class="ssub">Protocole Bluetooth. Utilise nRF Connect pour trouver les UUID exacts de tes chaussures.</div>
 
     <div class="gcard">
-      <div class="cfg-l" style="margin-bottom:8px">Clés d'authentification (stockées localement)</div>
-      <div style="display:grid;gap:6px">
-        <div class="cfg-l">Gauche — Auth Key (32 hex)</div>
-        <input class="cfg-i" id="cfg-left-key" type="text" placeholder="32 caractères hex" autocomplete="off">
-        <div class="cfg-l">Droite — Auth Key (32 hex)</div>
-        <input class="cfg-i" id="cfg-right-key" type="text" placeholder="32 caractères hex" autocomplete="off">
-        <button class="cbtn" style="margin-top:4px" onclick="saveShoeKeys()">💾 Sauvegarder les clés</button>
-      </div>
-    </div>
-
-    <div class="gcard">
       <div class="cfg-f">
         <div class="cfg-l">Service UUID</div>
         <input class="cfg-i" id="cfg-svc" type="text">
@@ -816,12 +805,12 @@ const SHOE_DATA = {
   left: {
     name: 'Nike Adapt AutoMax', colorway: 'CZ6799-001', firmware: '2.4.3',
     maxTightness: 58,
-    get authKey() { return localStorage.getItem('shoe_left_authKey') || ''; },
+    authKey: '9052f05b19c5720cd8870c0935301f38',
   },
   right: {
     name: 'Nike Adapt AutoMax', colorway: 'CZ6799-001', firmware: '2.4.3',
     maxTightness: 54,
-    get authKey() { return localStorage.getItem('shoe_right_authKey') || ''; },
+    authKey: 'fe52d2d20e321e3bc327792987ea9958',
   },
 };
 
@@ -1395,20 +1384,6 @@ function resetProbeIdx() {
   log('info', 'Probe index réinitialisé à #3');
 }
 
-function loadShoeKeys() {
-  const lk = gid('cfg-left-key'), rk = gid('cfg-right-key');
-  if (lk) lk.value = localStorage.getItem('shoe_left_authKey')  || '';
-  if (rk) rk.value = localStorage.getItem('shoe_right_authKey') || '';
-}
-
-function saveShoeKeys() {
-  const lv = (gid('cfg-left-key').value  || '').trim().toLowerCase();
-  const rv = (gid('cfg-right-key').value || '').trim().toLowerCase();
-  if (lv) localStorage.setItem('shoe_left_authKey',  lv);
-  if (rv) localStorage.setItem('shoe_right_authKey', rv);
-  toast('Clés sauvegardées ✓');
-  log('info', `Clé gauche: ${lv ? lv.slice(0,4)+'…' : '(vide)'}  Clé droite: ${rv ? rv.slice(0,4)+'…' : '(vide)'}`);
-}
 
 async function hardReload() {
   log('info', 'Hard reload: suppression SW + caches...');
@@ -1499,10 +1474,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  loadShoeKeys();
-  log('info', `App version: v22 — step2 probe #${step2ProbeIndex} (${STEP2_PROBES.length} probes total)`);
-  if (!SHOE_DATA.left.authKey || !SHOE_DATA.right.authKey)
-    log('info', '⚠️  Clés auth manquantes — configure-les dans Paramètres → Clés d\'authentification');
+  log('info', `App version: v22 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
