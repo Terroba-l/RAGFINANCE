@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v26</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v27</span>
       </div>
     </div>
 
@@ -973,6 +973,35 @@ const STEP2_PROBES = [
   { label: 'E8 01 tighten=1',         fn: (k,c) => new Uint8Array([0xE8,0x01,0x01]) },
   { label: 'E8 10 tighten=1',         fn: (k,c) => new Uint8Array([0xE8,0x10,0x01]) },
   { label: '01 10 + c + key[:15]',    fn: (k,c) => new Uint8Array([0x01,0x10,c,...k.slice(0,15)]) },
+  // ── Batch 5 : FE namespace crypto (FE 02 NACK observé → bonne piste) ───
+  { label: 'FE 00 + key',             fn: (k,c) => new Uint8Array([0xFE,0x00,...k]) },
+  { label: 'FE 10 + key',             fn: (k,c) => new Uint8Array([0xFE,0x10,...k]) },
+  { label: 'FE 01 AES-enc(c*16)',     fn: async (k,c) => {
+      const pad = new Uint8Array(16).fill(c);
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,pad);
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(ct).slice(0,16)]);
+  }},
+  { label: 'FE 01 AES-dec(c*16)',     fn: async (k,c) => {
+      const pad = new Uint8Array(16).fill(c);
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['decrypt']);
+      const pt = await crypto.subtle.decrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,pad);
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(pt).slice(0,16)]);
+  }},
+  { label: 'FE 01 HMAC-SHA256[:16](c)',fn: async (k,c) => {
+      const hk = await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const sig = await crypto.subtle.sign('HMAC',hk,new Uint8Array([c]));
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(sig).slice(0,16)]);
+  }},
+  { label: 'FE 01 SHA256(k+c)[:16]',  fn: async (k,c) => {
+      const h = await crypto.subtle.digest('SHA-256',new Uint8Array([...k,c]));
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(h).slice(0,16)]);
+  }},
+  { label: 'FE 01 AES-enc(key)',      fn: async (k,c) => {
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,k);
+      return new Uint8Array([0xFE,0x01,...new Uint8Array(ct).slice(0,16)]);
+  }},
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1527,7 +1556,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v26 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v27 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
