@@ -944,6 +944,31 @@ const STEP2_PROBES = [
       const sig = await crypto.subtle.sign('HMAC',hk,k);
       return new Uint8Array([0x01,0x10,...new Uint8Array(sig).slice(0,16)]);
   }},
+  // ── Batch 4 : AES-decrypt + CMAC + tighten test ─────────────────────────
+  { label: '01 10 AES-dec(c*16)',     fn: async (k,c) => {
+      const pad = new Uint8Array(16).fill(c);
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['decrypt']);
+      const pt = await crypto.subtle.decrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,pad);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(pt).slice(0,16)]);
+  }},
+  { label: '01 10 AES-dec(key)',      fn: async (k,c) => {
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['decrypt']);
+      const pt = await crypto.subtle.decrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(pt).slice(0,16)]);
+  }},
+  { label: '01 10 AES-dec(k,iv=k)',   fn: async (k,c) => {
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['decrypt']);
+      const pt = await crypto.subtle.decrypt({name:'AES-CBC',iv:k},ck,k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(pt).slice(0,16)]);
+  }},
+  { label: '01 10 AES-enc(k,iv=k)',   fn: async (k,c) => {
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:k},ck,k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(ct).slice(0,16)]);
+  }},
+  { label: 'E8 01 tighten=1',         fn: (k,c) => new Uint8Array([0xE8,0x01,0x01]) },
+  { label: 'E8 10 tighten=1',         fn: (k,c) => new Uint8Array([0xE8,0x10,0x01]) },
+  { label: '01 10 + c + key[:15]',    fn: (k,c) => new Uint8Array([0x01,0x10,c,...k.slice(0,15)]) },
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1060,8 +1085,8 @@ class NikeShoe {
       try { await this._write(step2bytes); } catch {}
       await sleep(800);
     } else {
-      log('info', `[${this.label}] Step2: aucun envoi, on attend 5s...`);
-      await sleep(5000);
+      log('info', `[${this.label}] Step2: aucun envoi, on attend 15s (FE 00 ?)...`);
+      await sleep(15000);
     }
   }
 
@@ -1184,13 +1209,14 @@ class NikeShoe {
 
   _startKeepalive() {
     if (this._kaTimer) return;
-    // Re-send auth every 4s — shoe responds C0 xx which keeps connection alive
     const keyBytes = h2b(SHOE_DATA[this.side].authKey);
     const authBytes = new Uint8Array([0x01, 0x10, ...keyBytes]);
     this._kaTimer = setInterval(async () => {
       if (!this.device?.gatt?.connected || !this.wChar) {
         clearInterval(this._kaTimer); this._kaTimer = null; return;
       }
+      // Only re-send step1 once auth is confirmed — avoid interfering with probe
+      if (!this._authOK) return;
       try { await this._write(authBytes); } catch {}
     }, 4000);
   }
