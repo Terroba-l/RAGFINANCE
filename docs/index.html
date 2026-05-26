@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v28</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v29</span>
       </div>
     </div>
 
@@ -1089,38 +1089,40 @@ class NikeShoe {
   async _auth() {
     this._authOK = false;
     this._challengeResolve = null;
-    const keyBytes = h2b(SHOE_DATA[this.side].authKey);
 
-    // Step 1: envoyer la clé
-    const step1 = new Uint8Array([0x01, 0x10, ...keyBytes]);
+    // Step1 initial
+    const step1 = new Uint8Array([0x01, 0x10, ...h2b(SHOE_DATA[this.side].authKey)]);
     log('tx', `[${this.label}] Auth step1 → ${b2h(step1)}`);
     try { await this._write(step1); } catch(e) { log('err', `Auth: ${e.message}`); return; }
 
-    // Attendre le challenge C0 xx de la chaussure (max 2s)
-    const challenge = await Promise.race([
-      new Promise(r => { this._challengeResolve = r; }),
-      sleep(2000).then(() => null),
-    ]);
-    this._challengeResolve = null;
+    // Boucle : le shoe envoie C0 01 toutes les ~3s → on enchaîne les probes
+    while (this.device?.gatt?.connected && !this._authOK) {
+      const challenge = await Promise.race([
+        new Promise(r => { this._challengeResolve = r; }),
+        sleep(5000).then(() => null),
+      ]);
+      this._challengeResolve = null;
 
-    if (challenge === null) {
-      log('info', `[${this.label}] Auth: pas de challenge C0 reçu`);
-      return;
-    }
+      if (challenge === null || !this.device?.gatt?.connected) break;
 
-    log('rx', `[${this.label}] Challenge reçu: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
+      log('rx', `[${this.label}] Challenge: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
 
-    const keyBytes2 = h2b(SHOE_DATA[this.side].authKey);
-    const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
-    const step2bytes = await probe.fn(keyBytes2, challenge);
-    log('info', `[${this.label}] Step2 probe #${step2ProbeIndex}: "${probe.label}"`);
-    if (step2bytes) {
-      log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
-      try { await this._write(step2bytes); } catch {}
-      await sleep(800);
-    } else {
-      log('info', `[${this.label}] Step2: aucun envoi, on attend 15s (FE 00 ?)...`);
-      await sleep(15000);
+      const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
+      const step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge);
+      log('info', `[${this.label}] Step2 probe #${step2ProbeIndex}: "${probe.label}"`);
+
+      // Incrémenter avant l'envoi — progrès sauvé même si déco immédiate (FE probes)
+      step2ProbeIndex++;
+      localStorage.setItem('step2ProbeIdx', step2ProbeIndex);
+      updateProbeStatus();
+
+      if (step2bytes) {
+        log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
+        try { await this._write(step2bytes); } catch { break; }
+      } else {
+        log('info', `[${this.label}] Step2: aucun envoi, attente 15s...`);
+        await sleep(15000);
+      }
     }
   }
 
@@ -1262,10 +1264,8 @@ class NikeShoe {
     updateBattUI(this.side,null);
     log('info',`[${this.label}] Déconnecté`);
     toast(`${this.label} déconnectée`);
-    step2ProbeIndex++;
-    localStorage.setItem('step2ProbeIdx', step2ProbeIndex);
     const next = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
-    log('info',`Prochaine connexion → step2 #${step2ProbeIndex}: "${next.label}"`);
+    log('info',`Prochain probe: #${step2ProbeIndex} "${next.label}"`);
     updateProbeStatus();
   }
 
@@ -1557,7 +1557,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v28 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v29 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
