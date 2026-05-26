@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v30</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v31</span>
       </div>
     </div>
 
@@ -1108,13 +1108,15 @@ class NikeShoe {
       log('rx', `[${this.label}] Challenge: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
 
       const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
-      const step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge);
       log('info', `[${this.label}] Step2 probe #${step2ProbeIndex}: "${probe.label}"`);
-
-      // Incrémenter avant l'envoi — progrès sauvé même si déco immédiate (FE probes)
+      // Incrémenter avant fn() — évite le blocage si fn() throw (ex: AES-dec padding invalid)
       step2ProbeIndex++;
       localStorage.setItem('step2ProbeIdx', step2ProbeIndex);
       updateProbeStatus();
+
+      let step2bytes;
+      try { step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge); }
+      catch(e) { log('err', `[${this.label}] Probe fn: ${e.message}`); step2bytes = null; }
 
       if (step2bytes) {
         log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
@@ -1557,7 +1559,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v30 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v31 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
