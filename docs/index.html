@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nike Adapt">
+  <meta name="theme-color" content="#35c759">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Nike Adapt</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --safe-top: env(safe-area-inset-top, 44px);
+      --safe-bot: env(safe-area-inset-bottom, 34px);
+      --glass:    rgba(255,255,255,0.18);
+      --glass2:   rgba(255,255,255,0.28);
+      --gborder:  rgba(255,255,255,0.25);
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Inter', -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ── Background ── */
+    #bg {
+      position: fixed; inset: 0; z-index: 0;
+      transition: background 0.7s ease;
+    }
+
+    /* ── App shell ── */
+    #app {
+      height: 100dvh; display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      position: relative; z-index: 10; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: calc(var(--safe-top) + 10px) 24px 10px;
+    }
+
+    .hdr-btn {
+      width: 36px; height: 36px; background: none; border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: white; position: relative;
+    }
+
+    .notif {
+      position: absolute; top: 0; right: 0;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #ff3b30; font-size: 0.55rem; font-weight: 700;
+      color: white; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── L / R hero ── */
+    .lr-view {
+      flex: 1; position: relative; z-index: 5; overflow: hidden;
+    }
+    .lr-l, .lr-r {
+      position: absolute;
+      font-family: 'Barlow Condensed', 'Impact', Arial, sans-serif;
+      font-weight: 900; color: white;
+      font-size: 108vw; line-height: 0.88;
+      letter-spacing: -4px; pointer-events: none;
+    }
+    .lr-l { top: -6%; left: -4%; }
+    .lr-r { bottom: -6%; right: -4%; }
+
+    /* ── Bottom nav ── */
+    nav.bnav {
+      position: relative; z-index: 10; flex-shrink: 0;
+      display: flex; justify-content: space-around; align-items: center;
+      padding: 14px 28px calc(var(--safe-bot) + 14px);
+    }
+    .nb {
+      width: 58px; height: 58px; border-radius: 50%;
+      background: var(--glass); border: 1px solid var(--gborder);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+      color: white;
+    }
+    .nb:active { transform: scale(0.92); }
+    .nb.active { background: var(--glass2); }
+
+    #led-dot-btn {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2.5px solid white; transition: background 0.4s;
+    }
+
+    /* ── Sheet ── */
+    .sheet {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column;
+      transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
+    }
+    .sheet.hidden  { transform: translateY(100%); pointer-events: none; }
+    .sheet.visible { transform: translateY(0); }
+
+    .sheet-bg {
+      position: absolute; inset: 0; z-index: -1; transition: background 0.5s;
+    }
+
+    .scontent {
+      flex: 1; overflow-y: auto;
+      padding: calc(var(--safe-top) + 24px) 28px calc(var(--safe-bot) + 90px);
+    }
+
+    .stitle {
+      font-size: 2.4rem; font-weight: 700; color: white;
+      margin-bottom: 8px; letter-spacing: -0.5px; line-height: 1.1;
+    }
+    .ssub {
+      font-size: 1rem; color: rgba(255,255,255,0.68);
+      margin-bottom: 36px; line-height: 1.45; max-width: 320px;
+    }
+
+    .sclose {
+      position: absolute;
+      bottom: calc(var(--safe-bot) + 16px); left: 50%;
+      transform: translateX(-50%);
+      width: 58px; height: 58px; border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 1.15rem;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* ── Glass card ── */
+    .gcard {
+      background: var(--glass); border: 1px solid var(--gborder);
+      border-radius: 20px; padding: 18px 20px; margin-bottom: 12px;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* ── Fit sheet ── */
+    .fit-pcts {
+      display: flex; gap: 14px; margin-bottom: 28px;
+    }
+    .fit-pct-card {
+      flex: 1; background: var(--glass); border: 1px solid var(--gborder);
+      border-radius: 20px; padding: 16px 12px; text-align: center;
+      backdrop-filter: blur(8px);
+    }
+    .fit-pct-label {
+      font-size: 0.62rem; text-transform: uppercase;
+      letter-spacing: 3px; color: rgba(255,255,255,0.55); margin-bottom: 6px;
+    }
+    .fit-pct-num {
+      font-family: 'Barlow Condensed', Impact, sans-serif; font-weight: 900;
+      font-size: 3.8rem; color: white; line-height: 1;
+    }
+    .fit-pct-batt {
+      font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 6px;
+    }
+
+    .slabel {
+      font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 2px; color: rgba(255,255,255,0.6); margin-bottom: 10px;
+    }
+    .swrap { margin-bottom: 22px; }
+
+    input[type=range] {
+      -webkit-appearance: none; width: 100%; height: 5px;
+      background: rgba(255,255,255,0.25); border-radius: 3px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 28px; height: 28px;
+      border-radius: 50%; background: white; cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+
+    .presets-label {
+      font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 3px; color: rgba(255,255,255,0.45);
+      margin-bottom: 12px; margin-top: 8px;
+    }
+    .presets-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .preset-pill {
+      background: var(--glass); border: 1px solid var(--gborder);
+      border-radius: 30px; padding: 10px 18px;
+      color: white; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .preset-pill.active { background: white; color: #000; border-color: white; }
+    .preset-pill .pval { font-size: 0.72rem; opacity: 0.6; }
+    .preset-pill.active .pval { opacity: 0.5; }
+
+    /* ── LED sheet ── */
+    .led-grid {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 16px;
+      margin-bottom: 28px;
+    }
+    .led-item { display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; }
+    .led-circle {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 3px solid transparent; transition: all 0.15s;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    }
+    .led-item.active .led-circle {
+      border-color: white; transform: scale(1.12);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
+    }
+    .led-name { font-size: 0.62rem; color: rgba(255,255,255,0.75); text-align: center; }
+
+    /* ── Battery sheet ── */
+    .batt-pair {
+      display: flex; justify-content: center; gap: 36px;
+      align-items: center; margin-top: 20px;
+    }
+    .batt-unit { text-align: center; }
+    .batt-wrap { position: relative; width: 88px; margin: 0 auto 16px; }
+    .batt-nub {
+      width: 30px; height: 9px; border-radius: 3px 3px 0 0;
+      background: rgba(255,255,255,0.35); margin: 0 auto;
+    }
+    .batt-body {
+      width: 88px; height: 126px;
+      border: 3px solid rgba(255,255,255,0.45);
+      border-radius: 14px; overflow: hidden;
+      position: relative; background: rgba(255,255,255,0.08);
+    }
+    .batt-fill {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(255,255,255,0.82); transition: height 0.6s ease;
+    }
+    .batt-val { font-size: 1.4rem; font-weight: 500; color: white; }
+    .batt-side { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+    /* ── More sheet ── */
+    .more-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--glass); border: 1px solid var(--gborder);
+      border-radius: 18px; padding: 18px 20px; margin-bottom: 10px;
+      color: white; font-size: 1rem; font-weight: 500;
+      cursor: pointer; backdrop-filter: blur(8px);
+      transition: background 0.12s;
+    }
+    .more-row:active { background: var(--glass2); }
+    .more-arr { opacity: 0.45; font-size: 1.1rem; }
+
+    /* ── Modes sheet ── */
+    .modes-hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.85rem; color: rgba(255,255,255,0.45); margin-bottom: 14px;
+    }
+    .mode-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--glass); border: 1px solid var(--gborder);
+      border-radius: 22px; padding: 20px 22px; margin-bottom: 10px;
+      cursor: pointer; backdrop-filter: blur(8px); transition: background 0.12s;
+    }
+    .mode-row:active { background: var(--glass2); }
+    .mode-name { font-size: 1.15rem; font-weight: 600; color: white; }
+    .mode-val { font-size: 0.9rem; color: rgba(255,255,255,0.5); }
+    .add-mode {
+      background: none; border: none; color: rgba(255,255,255,0.55);
+      font-size: 1rem; padding: 16px; width: 100%; cursor: pointer; text-align: center;
+    }
+
+    /* ── Shoes sheet (light background) ── */
+    .shoes-bg { background: #f2f2f7 !important; }
+    .stitle-dark { color: #000 !important; }
+    .shoe-card {
+      background: white; border-radius: 22px; padding: 20px;
+      margin-bottom: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    .shoe-conn { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+    .shoe-name { font-size: 1.25rem; font-weight: 700; color: #000; margin-bottom: 2px; }
+    .shoe-sub  { font-size: 0.85rem; color: #888; margin-bottom: 14px; }
+    .shoe-action {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 14px;
+      background: #f2f2f7; color: #000; font-size: 0.9rem; font-weight: 600;
+      padding: 12px; cursor: pointer; transition: background 0.12s;
+    }
+    .shoe-action:active { background: #e0e0e5; }
+    .shoe-action.connected { color: #ff3b30; border-color: #ffccc9; background: #fff5f5; }
+    .sclose-dark { background: rgba(0,0,0,0.1) !important; color: #000 !important; }
+
+    /* ── Config sheet ── */
+    .cfg-f { margin-bottom: 14px; }
+    .cfg-l { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.5); margin-bottom: 5px; }
+    .cfg-i {
+      width: 100%; background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px; padding: 10px 14px;
+      color: white; font-size: 0.78rem; font-family: monospace; outline: none;
+    }
+    .cfg-i:focus { border-color: rgba(255,255,255,0.5); }
+    .cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .cbtn {
+      border: none; border-radius: 14px; padding: 12px;
+      font-size: 0.85rem; font-weight: 600; cursor: pointer; width: 100%;
+      transition: opacity 0.15s;
+    }
+    .cbtn:active { opacity: 0.75; }
+    .cbtn-pri { background: white; color: #000; }
+    .cbtn-sec { background: rgba(255,255,255,0.15); color: white; border: 1px solid var(--gborder); }
+
+    .raw-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .raw-send {
+      background: rgba(255,255,255,0.15); border: 1px solid var(--gborder);
+      border-radius: 12px; padding: 10px 16px;
+      color: white; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+    }
+
+    .ble-log {
+      background: rgba(0,0,0,0.3); border-radius: 12px;
+      padding: 10px 12px; font-family: monospace; font-size: 0.65rem;
+      max-height: 130px; overflow-y: auto; color: rgba(255,255,255,0.5);
+    }
+    .ll { padding: 1px 0; }
+    .ll.tx  { color: #5ac8fa; }
+    .ll.rx  { color: #30d158; }
+    .ll.err { color: #ff453a; }
+
+    .warn {
+      background: rgba(255,165,0,0.15); border: 1px solid rgba(255,165,0,0.3);
+      border-radius: 14px; padding: 12px 16px;
+      font-size: 0.8rem; color: #ffd60a; line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: calc(100px + var(--safe-bot));
+      left: 50%; transform: translateX(-50%) translateY(20px);
+      background: rgba(0,0,0,0.72); border-radius: 22px;
+      padding: 10px 22px; color: white; font-size: 0.85rem;
+      opacity: 0; transition: all 0.3s; z-index: 300;
+      pointer-events: none; white-space: nowrap;
+      backdrop-filter: blur(12px);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Spinner ── */
+    .spin {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.15); border-top-color: #000;
+      border-radius: 50%; animation: rot 0.7s linear infinite; vertical-align: middle;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    details summary {
+      cursor: pointer; color: rgba(255,255,255,0.5); font-size: 0.8rem;
+      padding: 8px 0; list-style: none;
+    }
+    details summary::before { content: '▶ '; font-size: .55rem; }
+    details[open] summary::before { content: '▼ '; }
+  </style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="app">
+
+  <!-- ── Header ── -->
+  <header>
+    <button class="hdr-btn" onclick="openSheet('shoes')">
+      <svg width="28" height="18" viewBox="0 0 28 18" fill="white">
+        <path d="M1 14 Q7 8 14 7 Q20 6 26 9 L27 13 Q20 10 13 11 Q7 12 2 16 Z"/>
+        <path d="M2 16 Q8 13 13 11 Q20 10 27 13 L27 16 Q20 14 13 14 Q7 14 2 16 Z" opacity=".5"/>
+      </svg>
+    </button>
+
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="22" height="22" viewBox="0 0 80 55" fill="white" style="flex-shrink:0">
+        <path d="M4 44 Q18 28 38 22 Q55 18 74 24 L76 32 Q56 26 36 30 Q18 34 6 48 Z"/>
+        <path d="M6 48 Q24 38 36 30 Q56 26 76 32 L77 38 Q56 34 36 38 Q20 42 7 52 Z" opacity=".45"/>
+        <ellipse cx="20" cy="48" rx="5" ry="3" opacity=".3"/>
+      </svg>
+      <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1">
+        <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
+          <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
+        </svg>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v22</span>
+      </div>
+    </div>
+
+    <button class="hdr-btn" onclick="openSheet('config')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- ── L / R ── -->
+  <div class="lr-view">
+    <div class="lr-l">L</div>
+    <div class="lr-r">R</div>
+  </div>
+
+  <!-- ── Bottom nav ── -->
+  <nav class="bnav">
+    <!-- Fit -->
+    <button class="nb" onclick="openSheet('fit')">
+      <svg width="28" height="17" viewBox="0 0 28 17" fill="none">
+        <circle cx="8" cy="8.5" r="7.2" stroke="white" stroke-width="1.8"/>
+        <circle cx="20" cy="8.5" r="7.2" stroke="white" stroke-width="1.8"/>
+      </svg>
+    </button>
+    <!-- LED -->
+    <button class="nb active" onclick="openSheet('led')">
+      <div id="led-dot-btn" style="background:#35c759"></div>
+    </button>
+    <!-- Battery -->
+    <button class="nb" onclick="openSheet('battery')">
+      <svg width="15" height="22" viewBox="0 0 15 22" fill="none">
+        <rect x="4" y="0" width="7" height="4" rx="2" fill="white" opacity=".5"/>
+        <rect x="0.9" y="3.5" width="13.2" height="17.5" rx="3" stroke="white" stroke-width="1.8"/>
+        <rect x="3" y="11.5" width="9" height="7" rx="1.5" fill="white" opacity=".55"/>
+      </svg>
+    </button>
+    <!-- More -->
+    <button class="nb" onclick="openSheet('more')">
+      <svg width="22" height="15" viewBox="0 0 22 15" fill="white">
+        <rect width="22" height="2.4" rx="1.2"/>
+        <rect y="6.3" width="22" height="2.4" rx="1.2"/>
+        <rect y="12.6" width="22" height="2.4" rx="1.2"/>
+      </svg>
+    </button>
+  </nav>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: FIT
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-fit">
+  <div class="sheet-bg" id="sbg-fit"></div>
+  <div class="scontent">
+    <div class="stitle">Fit</div>
+    <div class="ssub">Ajuste le serrage de chaque chaussure indépendamment.</div>
+
+    <div class="fit-pcts">
+      <div class="fit-pct-card">
+        <div class="fit-pct-label">Gauche</div>
+        <div class="fit-pct-num" id="fpct-l">65%</div>
+        <div class="fit-pct-batt" id="fpct-bl">🔋 --%</div>
+      </div>
+      <div class="fit-pct-card">
+        <div class="fit-pct-label">Droite</div>
+        <div class="fit-pct-num" id="fpct-r">65%</div>
+        <div class="fit-pct-batt" id="fpct-br">🔋 --%</div>
+      </div>
+    </div>
+
+    <div class="swrap">
+      <div class="slabel">Gauche · max <span id="max-l">58</span>%</div>
+      <input type="range" min="0" max="58" value="29" id="sl-left" oninput="updateFit('left',+this.value)">
+    </div>
+    <div class="swrap">
+      <div class="slabel">Droite · max <span id="max-r">54</span>%</div>
+      <input type="range" min="0" max="54" value="27" id="sl-right" oninput="updateFit('right',+this.value)">
+    </div>
+
+    <div class="presets-label">Presets</div>
+    <div class="presets-row">
+      <button class="preset-pill" data-l="10" data-r="10" onclick="applyPreset(this)">Loose <span class="pval">10</span></button>
+      <button class="preset-pill active" data-l="44" data-r="38" onclick="applyPreset(this)">Move <span class="pval">44/38</span></button>
+      <button class="preset-pill" data-l="22" data-r="19" onclick="applyPreset(this)">Casual <span class="pval">22/19</span></button>
+      <button class="preset-pill" data-l="58" data-r="54" onclick="applyPreset(this)">Max <span class="pval">58/54</span></button>
+    </div>
+  </div>
+  <button class="sclose" onclick="closeSheet('fit')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: LED
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-led">
+  <div class="sheet-bg" id="sbg-led"></div>
+  <div class="scontent">
+    <div class="stitle">Light</div>
+    <div class="ssub">Choisis la couleur des LEDs. L'interface s'adapte automatiquement.</div>
+
+    <div class="led-grid">
+      <div class="led-item active" data-hex="#1db954" onclick="setLED(this)">
+        <div class="led-circle" style="background:#1db954"></div>
+        <div class="led-name">Vert</div>
+      </div>
+      <div class="led-item" data-hex="#fa5400" onclick="setLED(this)">
+        <div class="led-circle" style="background:#fa5400"></div>
+        <div class="led-name">Orange</div>
+      </div>
+      <div class="led-item" data-hex="#0071e3" onclick="setLED(this)">
+        <div class="led-circle" style="background:#0071e3"></div>
+        <div class="led-name">Bleu</div>
+      </div>
+      <div class="led-item" data-hex="#ff2d55" onclick="setLED(this)">
+        <div class="led-circle" style="background:#ff2d55"></div>
+        <div class="led-name">Rouge</div>
+      </div>
+      <div class="led-item" data-hex="#9b59b6" onclick="setLED(this)">
+        <div class="led-circle" style="background:#9b59b6"></div>
+        <div class="led-name">Violet</div>
+      </div>
+      <div class="led-item" data-hex="#f0c000" onclick="setLED(this)">
+        <div class="led-circle" style="background:#f0c000"></div>
+        <div class="led-name">Jaune</div>
+      </div>
+      <div class="led-item" data-hex="#e8590c" onclick="setLED(this)">
+        <div class="led-circle" style="background:#e8590c"></div>
+        <div class="led-name">Corail</div>
+      </div>
+      <div class="led-item" data-hex="#00bcd4" onclick="setLED(this)">
+        <div class="led-circle" style="background:#00bcd4"></div>
+        <div class="led-name">Cyan</div>
+      </div>
+      <div class="led-item" data-hex="#1c1c1e" onclick="setLED(this)">
+        <div class="led-circle" style="background:#2a2a2c;border:2px solid rgba(255,255,255,.2)"></div>
+        <div class="led-name">Off</div>
+      </div>
+    </div>
+
+    <div class="swrap">
+      <div class="slabel">Luminosité</div>
+      <input type="range" min="10" max="100" value="80" id="brightness" oninput="updateBrightness(+this.value)">
+    </div>
+  </div>
+  <button class="sclose" onclick="closeSheet('led')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: BATTERY
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-battery">
+  <div class="sheet-bg" id="sbg-battery"></div>
+  <div class="scontent" style="display:flex;flex-direction:column">
+    <div class="stitle">Battery Charged</div>
+    <div class="ssub">Your shoes are ready to play.</div>
+    <div class="batt-pair">
+      <div class="batt-unit">
+        <div class="batt-wrap">
+          <div class="batt-nub"></div>
+          <div class="batt-body"><div class="batt-fill" id="bf-l" style="height:0%"></div></div>
+        </div>
+        <div class="batt-val" id="bv-l">-- %</div>
+        <div class="batt-side">Left</div>
+      </div>
+      <div class="batt-unit">
+        <div class="batt-wrap">
+          <div class="batt-nub"></div>
+          <div class="batt-body"><div class="batt-fill" id="bf-r" style="height:0%"></div></div>
+        </div>
+        <div class="batt-val" id="bv-r">-- %</div>
+        <div class="batt-side">Right</div>
+      </div>
+    </div>
+  </div>
+  <button class="sclose" onclick="closeSheet('battery')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: MORE
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-more">
+  <div class="sheet-bg" id="sbg-more"></div>
+  <div class="scontent">
+    <div class="stitle">More</div>
+    <div style="margin-top:16px">
+      <div class="more-row" onclick="openSheet('modes')">
+        <span>Your Modes</span><span class="more-arr">›</span>
+      </div>
+      <div class="more-row" onclick="openSheet('shoes')">
+        <span>My Shoes</span><span class="more-arr">›</span>
+      </div>
+      <div class="more-row" onclick="openSheet('config')">
+        <span>BLE Settings</span><span class="more-arr">›</span>
+      </div>
+    </div>
+  </div>
+  <button class="sclose" onclick="closeSheet('more')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: MODES
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-modes">
+  <div class="sheet-bg" id="sbg-modes"></div>
+  <div class="scontent">
+    <div class="stitle">Your Modes</div>
+    <div class="ssub">Choose from your presets, or save custom fit and light combos for easy access.</div>
+    <div class="modes-hdr"><span>Tes modes</span><span>Firmware 2.4.3</span></div>
+    <div class="mode-row" onclick="applyMode(44,38,'Move')">
+      <span class="mode-name">Move</span><span class="mode-val">G 44% / D 38%</span>
+    </div>
+    <div class="mode-row" onclick="applyMode(22,19,'Casual')">
+      <span class="mode-name">Casual</span><span class="mode-val">G 22% / D 19%</span>
+    </div>
+    <button class="add-mode" onclick="toast('Bientôt disponible')">+ Ajouter un mode</button>
+  </div>
+  <button class="sclose" onclick="closeSheet('modes')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: SHOES (light BG)
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-shoes">
+  <div class="sheet-bg shoes-bg"></div>
+  <div class="scontent">
+    <div class="stitle stitle-dark">My Shoes</div>
+    <div style="margin-top:20px">
+      <!-- Left -->
+      <div class="shoe-card">
+        <div class="shoe-conn" id="sc-conn-l" style="color:#aaa">Not Connected</div>
+        <div class="shoe-name">Nike Adapt AutoMax</div>
+        <div class="shoe-sub" id="sc-name-l">Gauche · CZ6799-001 · FW 2.4.3</div>
+        <div style="font-size:.72rem;color:#bbb;margin:-10px 0 14px;font-family:monospace">Key: e497bca804</div>
+        <button class="shoe-action" id="sc-btn-l" onclick="connectShoe('left')">Connecter</button>
+      </div>
+      <!-- Right -->
+      <div class="shoe-card">
+        <div class="shoe-conn" id="sc-conn-r" style="color:#aaa">Not Connected</div>
+        <div class="shoe-name">Nike Adapt AutoMax</div>
+        <div class="shoe-sub" id="sc-name-r">Droite · CZ6799-001 · FW 2.4.3</div>
+        <div style="font-size:.72rem;color:#bbb;margin:-10px 0 14px;font-family:monospace">Key: 5983b6a804</div>
+        <button class="shoe-action" id="sc-btn-r" onclick="connectShoe('right')">Connecter</button>
+      </div>
+    </div>
+    <div id="no-ble-warn" class="warn" style="display:none">
+      ⚠️ Web Bluetooth non supporté dans Safari.<br>
+      Sur iPhone : installe <strong>Bluefy</strong> (App Store).<br>
+      Sur Android/Desktop : utilise Chrome.
+    </div>
+  </div>
+  <button class="sclose sclose-dark" onclick="closeSheet('shoes')">✕</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHEET: CONFIG / BLE
+══════════════════════════════════════════ -->
+<div class="sheet hidden" id="sheet-config">
+  <div class="sheet-bg" id="sbg-config" style="background:#111111"></div>
+  <div class="scontent">
+    <div class="stitle">BLE Settings</div>
+    <div class="ssub">Protocole Bluetooth. Utilise nRF Connect pour trouver les UUID exacts de tes chaussures.</div>
+
+    <div class="gcard">
+      <div class="cfg-l" style="margin-bottom:8px">Clés d'authentification (stockées localement)</div>
+      <div style="display:grid;gap:6px">
+        <div class="cfg-l">Gauche — Auth Key (32 hex)</div>
+        <input class="cfg-i" id="cfg-left-key" type="text" placeholder="32 caractères hex" autocomplete="off">
+        <div class="cfg-l">Droite — Auth Key (32 hex)</div>
+        <input class="cfg-i" id="cfg-right-key" type="text" placeholder="32 caractères hex" autocomplete="off">
+        <button class="cbtn" style="margin-top:4px" onclick="saveShoeKeys()">💾 Sauvegarder les clés</button>
+      </div>
+    </div>
+
+    <div class="gcard">
+      <div class="cfg-f">
+        <div class="cfg-l">Service UUID</div>
+        <input class="cfg-i" id="cfg-svc" type="text">
+      </div>
+      <div class="cfg-grid">
+        <div class="cfg-f">
+          <div class="cfg-l">Write Char UUID</div>
+          <input class="cfg-i" id="cfg-wc" type="text">
+        </div>
+        <div class="cfg-f">
+          <div class="cfg-l">Notify Char UUID</div>
+          <input class="cfg-i" id="cfg-nc" type="text">
+        </div>
+      </div>
+      <div class="cfg-grid">
+        <div class="cfg-f">
+          <div class="cfg-l">Serrage (hex)</div>
+          <input class="cfg-i" id="cfg-tight" type="text">
+        </div>
+        <div class="cfg-f">
+          <div class="cfg-l">LED (hex)</div>
+          <input class="cfg-i" id="cfg-led" type="text">
+        </div>
+        <div class="cfg-f">
+          <div class="cfg-l">Batterie (hex)</div>
+          <input class="cfg-i" id="cfg-batt" type="text">
+        </div>
+        <div class="cfg-f">
+          <div class="cfg-l">Délacer (hex)</div>
+          <input class="cfg-i" id="cfg-unlace" type="text">
+        </div>
+      </div>
+      <div class="cfg-grid">
+        <button class="cbtn cbtn-pri" onclick="saveProto()">Sauvegarder</button>
+        <button class="cbtn cbtn-sec" onclick="resetProto()">Réinitialiser</button>
+      </div>
+    </div>
+
+    <div class="gcard">
+      <div class="cfg-l" style="margin-bottom:8px">Auth Probe (chaque connexion = probe suivant)</div>
+      <div id="probe-status" style="font-size:.7rem;color:rgba(255,255,255,.5);margin-bottom:10px">
+        Probe actuel: #0 — écoute seule
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button class="cbtn cbtn-sec" onclick="manualProbe('FE 01')">FE 01 + key</button>
+        <button class="cbtn cbtn-sec" onclick="manualProbe('01 10')">01 10 + key</button>
+        <button class="cbtn cbtn-sec" onclick="manualProbe('02 10')">02 10 + key</button>
+        <button class="cbtn cbtn-sec" onclick="manualProbe('')">key brut</button>
+        <button class="cbtn cbtn-sec" onclick="manualProbe('FE 00')">FE 00 + key</button>
+        <button class="cbtn cbtn-sec" onclick="manualProbe('FE 10')">FE 10 + key</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+        <button class="cbtn" style="background:#c0392b" onclick="resetProbeIdx()">↺ Reset probe #3</button>
+        <button class="cbtn" style="background:#7f8c8d" onclick="hardReload()">⟳ Hard Reload SW</button>
+      </div>
+    </div>
+
+    <div class="gcard">
+      <div class="cfg-l" style="margin-bottom:8px">Commande RAW</div>
+      <div class="raw-row">
+        <input class="cfg-i" id="raw-cmd" type="text" placeholder="Ex: E8 80" style="flex:1">
+        <button class="raw-send" onclick="sendRaw()">Envoyer</button>
+      </div>
+    </div>
+
+    <div class="gcard">
+      <details>
+        <summary>Services découverts</summary>
+        <div id="disc-log" style="margin-top:10px;font-size:.68rem;color:rgba(255,255,255,.5)">
+          Connecte une chaussure pour voir ses services BLE.
+        </div>
+      </details>
+    </div>
+
+    <div class="gcard">
+      <details>
+        <summary>Log BLE</summary>
+        <div class="ble-log" id="ble-log" style="margin-top:10px"></div>
+        <button class="cbtn cbtn-sec" onclick="clearLog()" style="margin-top:8px;width:auto;padding:6px 14px;font-size:.78rem">Effacer</button>
+      </details>
+    </div>
+  </div>
+  <button class="sclose" onclick="closeSheet('config')">✕</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════
+// LED Colors & Background
+// ════════════════════════════════════
+const LED_COLORS = {
+  '#1db954': { light: '#38e07a', dark: '#0d8a3a', name: 'Vert'    },
+  '#fa5400': { light: '#fc7a30', dark: '#b33a00', name: 'Orange'  },
+  '#0071e3': { light: '#3395f5', dark: '#004fa0', name: 'Bleu'    },
+  '#ff2d55': { light: '#ff5c75', dark: '#b30028', name: 'Rouge'   },
+  '#9b59b6': { light: '#b87fd4', dark: '#6c3483', name: 'Violet'  },
+  '#f0c000': { light: '#f5d44a', dark: '#a07e00', name: 'Jaune'   },
+  '#e8590c': { light: '#f07840', dark: '#9e3c07', name: 'Corail'  },
+  '#00bcd4': { light: '#4dd8e8', dark: '#007a8a', name: 'Cyan'    },
+  '#1c1c1e': { light: '#3a3a3c', dark: '#0a0a0a', name: 'Off'     },
+};
+const DISCONNECTED_BG = 'radial-gradient(ellipse at 30% 20%, #2a4a6b, #0d1f33 70%)';
+
+let currentLed = '#1db954';
+let brightness = 80;
+
+function applyBackground(hex) {
+  const bg = document.getElementById('bg');
+  const info = LED_COLORS[hex] || { light: '#38e07a', dark: '#0d8a3a' };
+  let gradient;
+  if (hex === '#1c1c1e') {
+    gradient = 'radial-gradient(ellipse at 28% 18%, #2a2a2c, #0a0a0a 75%)';
+  } else {
+    gradient = `radial-gradient(ellipse at 28% 18%, ${info.light} 0%, ${hex} 45%, ${info.dark} 100%)`;
+  }
+  bg.style.background = gradient;
+  // Apply same bg to colored sheets (not config which has its own dark bg)
+  ['sbg-fit','sbg-led','sbg-battery','sbg-more','sbg-modes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.background = gradient;
+  });
+  // LED dot in nav
+  const dot = document.getElementById('led-dot-btn');
+  if (dot) dot.style.background = hex === '#1c1c1e' ? '#3a3a3c' : hex;
+}
+
+function setLED(el) {
+  document.querySelectorAll('.led-item').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  currentLed = el.dataset.hex;
+  applyBackground(currentLed);
+  sendLEDToBLE();
+  toast('LED: ' + (LED_COLORS[currentLed]?.name || currentLed));
+}
+
+function updateBrightness(val) {
+  brightness = val;
+  sendLEDToBLE();
+}
+
+function sendLEDToBLE() {
+  const hex = currentLed === '#1c1c1e' ? '#000000' : currentLed;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const br = brightness / 100;
+  const R = Math.round(r*br), G = Math.round(g*br), B = Math.round(b*br);
+  if (shoes.left.connected)  shoes.left.setLED(R,G,B);
+  if (shoes.right.connected) shoes.right.setLED(R,G,B);
+}
+
+// ════════════════════════════════════
+// Shoe-specific data (extracted from Nike Adapt app)
+// ════════════════════════════════════
+const SHOE_DATA = {
+  left: {
+    name: 'Nike Adapt AutoMax', colorway: 'CZ6799-001', firmware: '2.4.3',
+    maxTightness: 58,
+    get authKey() { return localStorage.getItem('shoe_left_authKey') || ''; },
+  },
+  right: {
+    name: 'Nike Adapt AutoMax', colorway: 'CZ6799-001', firmware: '2.4.3',
+    maxTightness: 54,
+    get authKey() { return localStorage.getItem('shoe_right_authKey') || ''; },
+  },
+};
+
+const SAVED_MODES = [
+  { name: 'Move',   left: 44, right: 38 },
+  { name: 'Casual', left: 22, right: 19 },
+];
+
+// ════════════════════════════════════
+// Protocol Config
+// ════════════════════════════════════
+const DEFAULTS = {
+  svc:    '1A2328AF-3D0B-4B04-A2AA-973C239D3904',
+  wc:     '226BAEA6-1543-40C2-8EAE-A69B02171B08',
+  nc:     '30C4142F-B083-42CF-865A-D5B91801BCD7',
+  tight:  'E8',
+  led:    'E6',
+  batt:   'E3',
+  unlace: 'E9 00',
+};
+let P = { ...DEFAULTS, ...safeJSON(localStorage.getItem('nikeProto')) };
+
+function safeJSON(s) { try { return JSON.parse(s)||{}; } catch { return {}; } }
+
+function fillCfg() {
+  gid('cfg-svc').value    = P.svc;
+  gid('cfg-wc').value     = P.wc;
+  gid('cfg-nc').value     = P.nc;
+  gid('cfg-tight').value  = P.tight;
+  gid('cfg-led').value    = P.led;
+  gid('cfg-batt').value   = P.batt;
+  gid('cfg-unlace').value = P.unlace;
+}
+
+function saveProto() {
+  P.svc    = gid('cfg-svc').value.trim()    || DEFAULTS.svc;
+  P.wc     = gid('cfg-wc').value.trim()     || DEFAULTS.wc;
+  P.nc     = gid('cfg-nc').value.trim()     || DEFAULTS.nc;
+  P.tight  = gid('cfg-tight').value.trim()  || DEFAULTS.tight;
+  P.led    = gid('cfg-led').value.trim()    || DEFAULTS.led;
+  P.batt   = gid('cfg-batt').value.trim()   || DEFAULTS.batt;
+  P.unlace = gid('cfg-unlace').value.trim() || DEFAULTS.unlace;
+  localStorage.setItem('nikeProto', JSON.stringify(P));
+  toast('✓ Protocole sauvegardé');
+}
+
+function resetProto() {
+  P = { ...DEFAULTS };
+  localStorage.removeItem('nikeProto');
+  fillCfg();
+  toast('↺ Réinitialisé');
+}
+
+// ════════════════════════════════════
+// BLE Shoe class
+// ════════════════════════════════════
+// ════════════════════════════════════
+// Auth probe sequences (one per connection attempt)
+// ════════════════════════════════════
+// Step 2 probes — shoe responds C0 xx to step1, we must respond correctly
+// C0 xx responses always get C0 02 → trying non-C0 formats now
+// Tried: C0 01(echo)=FAIL, C0 91(XOR)=FAIL, C0 90(k[0])=FAIL
+let step2ProbeIndex = Math.max(3, parseInt(localStorage.getItem('step2ProbeIdx') ?? '3', 10));
+const STEP2_PROBES = [
+  { label: 'écho C0+c [FAIL]',       fn: (k,c) => new Uint8Array([0xC0, c]) },
+  { label: 'XOR k[0]^c [FAIL]',      fn: (k,c) => new Uint8Array([0xC0, k[0]^c]) },
+  { label: 'k[0] direct [FAIL]',     fn: (k,c) => new Uint8Array([0xC0, k[0]]) },
+  { label: 'k[c] index → C0 52',     fn: (k,c) => new Uint8Array([0xC0, k[c%k.length]]) },
+  { label: 'C0 FE (NOT c)',           fn: (k,c) => new Uint8Array([0xC0, (~c)&0xFF]) },
+  { label: 'C0 00',                   fn: (k,c) => new Uint8Array([0xC0, 0x00]) },
+  { label: 'C0 XOR-all-key^c',       fn: (k,c) => { const x=k.reduce((a,b)=>a^b,0); return new Uint8Array([0xC0, x^c]); } }, // C0 B2
+  { label: 'aucun step2 (test E8)',   fn: (k,c) => null },
+  // Non-C0 formats:
+  { label: '01 10 key again',         fn: (k,c) => new Uint8Array([0x01, 0x10, ...k]) },
+  { label: '01 01 + full key',        fn: (k,c) => new Uint8Array([0x01, 0x01, ...k]) },
+  { label: '02 10 + key',             fn: (k,c) => new Uint8Array([0x02, 0x10, ...k]) },
+  { label: '01 00',                   fn: (k,c) => new Uint8Array([0x01, 0x00]) },
+  { label: '02 00',                   fn: (k,c) => new Uint8Array([0x02, 0x00]) },
+  { label: '01 01 c seul',            fn: (k,c) => new Uint8Array([0x01, 0x01, c]) },
+  { label: 'FE 01 + key',             fn: (k,c) => new Uint8Array([0xFE, 0x01, ...k]) },
+  // ── Batch 2 : variations 01 10 ──────────────────────────────────────────
+  { label: '01 11 + key',             fn: (k,c) => new Uint8Array([0x01,0x11,...k]) },
+  { label: '01 10 key^c',             fn: (k,c) => new Uint8Array([0x01,0x10,...k.map(b=>b^c)]) },
+  { label: '01 10 c+key[:15]',        fn: (k,c) => new Uint8Array([0x01,0x10,c,...k.slice(0,15)]) },
+  { label: '01 10 c*16',              fn: (k,c) => new Uint8Array([0x01,0x10,...new Array(16).fill(c)]) },
+  { label: '01 10 key rev',           fn: (k,c) => new Uint8Array([0x01,0x10,...[...k].reverse()]) },
+  { label: '03 10 + key',             fn: (k,c) => new Uint8Array([0x03,0x10,...k]) },
+  { label: '00 10 + key',             fn: (k,c) => new Uint8Array([0x00,0x10,...k]) },
+  { label: 'byte c seul',             fn: (k,c) => new Uint8Array([c]) },
+  { label: 'FE 02 + key',             fn: (k,c) => new Uint8Array([0xFE,0x02,...k]) },
+  { label: 'E8 01 + key',             fn: (k,c) => new Uint8Array([0xE8,0x01,...k]) },
+  // ── Batch 3 : crypto WebCrypto ───────────────────────────────────────────
+  { label: '01 10 AES-enc(c*16)',     fn: async (k,c) => {
+      const pad = new Uint8Array(16).fill(c);
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,pad);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(ct).slice(0,16)]);
+  }},
+  { label: '01 10 AES-enc(key)',      fn: async (k,c) => {
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(ct).slice(0,16)]);
+  }},
+  { label: '01 11 AES-enc(c*16)',     fn: async (k,c) => {
+      const pad = new Uint8Array(16).fill(c);
+      const ck = await crypto.subtle.importKey('raw',k,{name:'AES-CBC'},false,['encrypt']);
+      const ct = await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},ck,pad);
+      return new Uint8Array([0x01,0x11,...new Uint8Array(ct).slice(0,16)]);
+  }},
+  { label: '01 10 HMAC-SHA256[:16](c)',fn: async (k,c) => {
+      const hk = await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const sig = await crypto.subtle.sign('HMAC',hk,new Uint8Array([c]));
+      return new Uint8Array([0x01,0x10,...new Uint8Array(sig).slice(0,16)]);
+  }},
+  { label: '01 10 SHA256(key)[:16]',  fn: async (k,c) => {
+      const h = await crypto.subtle.digest('SHA-256',k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(h).slice(0,16)]);
+  }},
+  { label: '01 10 SHA256(k+c)[:16]',  fn: async (k,c) => {
+      const d = new Uint8Array([...k,c]);
+      const h = await crypto.subtle.digest('SHA-256',d);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(h).slice(0,16)]);
+  }},
+  { label: '01 10 SHA256(c+k)[:16]',  fn: async (k,c) => {
+      const d = new Uint8Array([c,...k]);
+      const h = await crypto.subtle.digest('SHA-256',d);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(h).slice(0,16)]);
+  }},
+  { label: '01 10 HMAC[:16](key)',    fn: async (k,c) => {
+      const hk = await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const sig = await crypto.subtle.sign('HMAC',hk,k);
+      return new Uint8Array([0x01,0x10,...new Uint8Array(sig).slice(0,16)]);
+  }},
+];
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+class NikeShoe {
+  constructor(side) {
+    this.side = side;
+    this.label = side === 'left' ? 'Gauche' : 'Droite';
+    this.device = this.server = this.wChar = this.nChar = null;
+    this.battery = null; this.connected = false; this._authOK = false; this._kaTimer = null; this._currentFit = null; this._challengeResolve = null;
+  }
+
+  async connect() {
+    const uuids = [P.svc, P.wc, P.nc,
+      '6e3a0001-1000-4000-b000-000000000000',
+      '6e3a0002-1000-4000-b000-000000000000',
+      '6e3a0003-1000-4000-b000-000000000000',
+    ].filter((v,i,a)=>v&&a.indexOf(v)===i);
+
+    // Shoes advertise as "EARL RIGHT" / "EARL LEFT"
+    this.device = await navigator.bluetooth.requestDevice({
+      filters:[
+        {namePrefix:'EARL'},
+        {namePrefix:'Nike Adapt'},
+        {namePrefix:'Nike'},
+        {namePrefix:'Adapt'},
+      ],
+      optionalServices:[
+        '1A2328AF-3D0B-4B04-A2AA-973C239D3904',
+        '226BAEA6-1543-40C2-8EAE-A69B02171B08',
+        '30C4142F-B083-42CF-865A-D5B91801BCD7',
+        'battery_service','device_information',...uuids
+      ],
+    });
+    log('info',`[${this.label}] ${this.device.name}`);
+    setShoeUI(this.side,'connecting',this.device.name);
+
+    this.device.addEventListener('gattserverdisconnected',()=>this._disc());
+    this.server = await this.device.gatt.connect();
+    await this._discover();
+    await this._auth();
+    await this._readDeviceInfo();
+    await this._readBatt();
+    this.connected = true;
+    this._startKeepalive();
+    setShoeUI(this.side,'connected',this.device.name);
+    toast(`✓ ${this.label} connectée`);
+  }
+
+  async _discover() {
+    this.wChar = this.nChar = null;
+    let svcs;
+    try { svcs = await this.server.getPrimaryServices(); }
+    catch(e){ log('err',`[${this.label}] Services: ${e.message}`); return; }
+
+    const found = [];
+    for (const svc of svcs) {
+      const info = { uuid: svc.uuid, chars: [] };
+      log('info',`[${this.label}] Svc: ${svc.uuid}`);
+      try {
+        for (const c of await svc.getCharacteristics()) {
+          const props = Object.keys(c.properties).filter(k=>c.properties[k]);
+          info.chars.push({ uuid:c.uuid, props });
+          log('info',`  └ ${c.uuid} [${props.join(',')}]`);
+
+          const svcM = svc.uuid.toLowerCase()===P.svc.toLowerCase();
+          const wcM  = c.uuid.toLowerCase()===P.wc.toLowerCase();
+          const ncM  = c.uuid.toLowerCase()===P.nc.toLowerCase();
+
+          if (!this.wChar && (props.includes('write')||props.includes('writeWithoutResponse')) && (svcM||wcM)){
+            this.wChar=c; log('tx',`[${this.label}] Write: ${c.uuid}`);
+          }
+          if (!this.nChar && (props.includes('notify')||props.includes('indicate')) && (svcM||ncM)){
+            this.nChar=c;
+            try{ await c.startNotifications(); c.addEventListener('characteristicvaluechanged',e=>this._notify(e)); log('rx',`[${this.label}] Notify ON`); }catch{}
+          }
+        }
+      } catch(e){ log('err',`[${this.label}] Chars(${svc.uuid}): ${e.message}`); }
+      found.push(info);
+    }
+    renderDisc(this.side, found);
+  }
+
+  async _auth() {
+    this._authOK = false;
+    this._challengeResolve = null;
+    const keyBytes = h2b(SHOE_DATA[this.side].authKey);
+
+    // Step 1: envoyer la clé
+    const step1 = new Uint8Array([0x01, 0x10, ...keyBytes]);
+    log('tx', `[${this.label}] Auth step1 → ${b2h(step1)}`);
+    try { await this._write(step1); } catch(e) { log('err', `Auth: ${e.message}`); return; }
+
+    // Attendre le challenge C0 xx de la chaussure (max 2s)
+    const challenge = await Promise.race([
+      new Promise(r => { this._challengeResolve = r; }),
+      sleep(2000).then(() => null),
+    ]);
+    this._challengeResolve = null;
+
+    if (challenge === null) {
+      log('info', `[${this.label}] Auth: pas de challenge C0 reçu`);
+      return;
+    }
+
+    log('rx', `[${this.label}] Challenge reçu: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
+
+    const keyBytes2 = h2b(SHOE_DATA[this.side].authKey);
+    const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
+    const step2bytes = await probe.fn(keyBytes2, challenge);
+    log('info', `[${this.label}] Step2 probe #${step2ProbeIndex}: "${probe.label}"`);
+    if (step2bytes) {
+      log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
+      try { await this._write(step2bytes); } catch {}
+      await sleep(800);
+    } else {
+      log('info', `[${this.label}] Step2: aucun envoi, on attend 5s...`);
+      await sleep(5000);
+    }
+  }
+
+  async _readDeviceInfo() {
+    try {
+      const svc = await this.server.getPrimaryService('device_information');
+      const chars = await svc.getCharacteristics();
+      for (const c of chars) {
+        try {
+          const v = await c.readValue();
+          const txt = new TextDecoder().decode(v);
+          log('info', `[${this.label}] DevInfo ${c.uuid.slice(4,8)}: ${txt}`);
+        } catch {}
+      }
+    } catch(e) { log('info', `[${this.label}] DevInfo: ${e.message}`); }
+  }
+
+  async _readBatt() {
+    try {
+      const svc  = await this.server.getPrimaryService('battery_service');
+      const char = await svc.getCharacteristic('battery_level');
+      this.battery = (await char.readValue()).getUint8(0);
+      log('rx',`[${this.label}] Batt: ${this.battery}%`);
+      try {
+        await char.startNotifications();
+        char.addEventListener('characteristicvaluechanged',e=>{
+          this.battery=e.target.value.getUint8(0);
+          updateBattUI(this.side,this.battery);
+          log('rx',`[${this.label}] Batt: ${this.battery}%`);
+        });
+      } catch{}
+      updateBattUI(this.side,this.battery);
+    } catch {
+      if (this.wChar && P.batt) {
+        try{ await this._write(h2b(P.batt)); }catch{}
+      }
+    }
+  }
+
+  async setTightness(val) {
+    if (!this.connected || !this.wChar) {
+      log('err', `[${this.label}] setTightness(${val}) ignoré — connected=${this.connected} wChar=${!!this.wChar}`);
+      return false;
+    }
+    const raw = Math.min(Math.round(val), SHOE_DATA[this.side].maxTightness);
+    // Try both known formats
+    const cmds = [
+      new Uint8Array([...h2b(P.tight), raw]),          // E8 [val]
+      new Uint8Array([0x01, 0x01, raw]),                 // 01 01 [val]
+    ];
+    for (const cmd of cmds) {
+      try {
+        await this._write(cmd);
+        log('tx', `[${this.label}] Tight ${val} → ${b2h(cmd)}`);
+        await sleep(400);
+      } catch(e) { log('err', `Tight: ${e.message}`); }
+    }
+    return true;
+  }
+
+  async setLED(r,g,b) {
+    if (!this.connected||!this.wChar) return false;
+    try {
+      const cmd = new Uint8Array([...h2b(P.led), r, g, b]);
+      await this._write(cmd);
+      log('tx',`[${this.label}] LED(${r},${g},${b}): ${b2h(cmd)}`);
+      return true;
+    } catch(e){ log('err',`LED: ${e.message}`); return false; }
+  }
+
+  async sendRaw(hex) {
+    if (!this.connected||!this.wChar) throw new Error(`${this.label} non connectée`);
+    const cmd = h2b(hex); await this._write(cmd);
+    log('tx',`[${this.label}] RAW: ${b2h(cmd)}`);
+  }
+
+  async _write(bytes) {
+    this.wChar.properties.writeWithoutResponse
+      ? await this.wChar.writeValueWithoutResponse(bytes)
+      : await this.wChar.writeValue(bytes);
+  }
+
+  _notify(e) {
+    const b = new Uint8Array(e.target.value.buffer);
+    const ascii = Array.from(b).map(x=>x>=32&&x<127?String.fromCharCode(x):'.').join('');
+    log('rx',`[${this.label}] ← ${b2h(b)}  "${ascii}"`);
+
+    if (b[0] === 0xC0) {
+      this._currentFit = b[1];
+      if (this._challengeResolve) {
+        // Résoudre la promesse du challenge auth
+        this._challengeResolve(b[1]);
+        this._challengeResolve = null;
+      } else if (!this._authOK) {
+        log('rx', `[${this.label}] C0 ${b[1]} (pas encore auth OK)`);
+      } else {
+        log('rx', `[${this.label}] C0 keepalive — position: ${b[1]}`);
+      }
+    } else if (b[0] === 0xFE) {
+      if (b[1] === 0x00) {
+        this._authOK = true;
+        log('rx', `[${this.label}] ✅ AUTH OK (FE 00) !`);
+        toast(`✅ ${this.label} auth OK!`);
+      } else if (b[1] === 0x02) {
+        log('rx', `[${this.label}] ✗ FE 02 NACK — clé invalide`);
+      } else {
+        log('rx', `[${this.label}] FE ${b[1].toString(16).padStart(2,'0').toUpperCase()} (${b.length} bytes)`);
+      }
+    } else if (b[0] === 0xE8) {
+      if (b[1] === 0x00) {
+        log('rx', `[${this.label}] ✅ Tighten ACK`);
+      } else {
+        log('rx', `[${this.label}] E8 ${b[1].toString(16).padStart(2,'0').toUpperCase()} — tighten NACK/réponse`);
+      }
+    } else if (b[0] === 0xE3 || b[0] === 0x03) {
+      this.battery = b[1]; updateBattUI(this.side, this.battery);
+      log('rx', `[${this.label}] Batterie: ${b[1]}%`);
+    }
+  }
+
+  _startKeepalive() {
+    if (this._kaTimer) return;
+    // Re-send auth every 4s — shoe responds C0 xx which keeps connection alive
+    const keyBytes = h2b(SHOE_DATA[this.side].authKey);
+    const authBytes = new Uint8Array([0x01, 0x10, ...keyBytes]);
+    this._kaTimer = setInterval(async () => {
+      if (!this.device?.gatt?.connected || !this.wChar) {
+        clearInterval(this._kaTimer); this._kaTimer = null; return;
+      }
+      try { await this._write(authBytes); } catch {}
+    }, 4000);
+  }
+
+  _disc() {
+    this.connected=false; this.wChar=this.nChar=null; this._authOK=false;
+    if (this._kaTimer) { clearInterval(this._kaTimer); this._kaTimer=null; }
+    setShoeUI(this.side,'off',null);
+    updateBattUI(this.side,null);
+    log('info',`[${this.label}] Déconnecté`);
+    toast(`${this.label} déconnectée`);
+    step2ProbeIndex++;
+    localStorage.setItem('step2ProbeIdx', step2ProbeIndex);
+    const next = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
+    log('info',`Prochaine connexion → step2 #${step2ProbeIndex}: "${next.label}"`);
+    updateProbeStatus();
+  }
+
+  async disconnect() {
+    if (this.device?.gatt?.connected) this.device.gatt.disconnect();
+    this._disc();
+  }
+}
+
+// ════════════════════════════════════
+// State
+// ════════════════════════════════════
+const shoes = { left: new NikeShoe('left'), right: new NikeShoe('right') };
+const ST    = {
+  left:  { fit: Math.round(SHOE_DATA.left.maxTightness  * 0.5) },
+  right: { fit: Math.round(SHOE_DATA.right.maxTightness * 0.5) },
+};
+
+// ════════════════════════════════════
+// Sheets
+// ════════════════════════════════════
+let openSheets = [];
+
+function openSheet(name) {
+  const el = gid('sheet-' + name);
+  if (!el) return;
+  el.classList.remove('hidden'); el.classList.add('visible');
+  if (!openSheets.includes(name)) openSheets.push(name);
+}
+
+function closeSheet(name) {
+  const el = gid('sheet-' + name);
+  if (!el) return;
+  el.classList.remove('visible'); el.classList.add('hidden');
+  openSheets = openSheets.filter(s=>s!==name);
+}
+
+// ════════════════════════════════════
+// Fit
+// ════════════════════════════════════
+function updateFit(side, val) {
+  const maxT = SHOE_DATA[side].maxTightness;
+  val = Math.min(Math.round(val), maxT);
+  ST[side].fit = val;
+  gid('sl-'+side).value = val;
+  gid('fpct-'+side[0]).textContent = val + '%';
+  if (shoes[side].connected) shoes[side].setTightness(val);
+}
+
+function applyPreset(el) {
+  document.querySelectorAll('.preset-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  const l = parseInt(el.dataset.l), r = parseInt(el.dataset.r);
+  updateFit('left',l); updateFit('right',r);
+  toast(el.firstChild.textContent.trim());
+}
+
+function applyMode(l, r, name) {
+  updateFit('left',l); updateFit('right',r);
+  closeSheet('modes');
+  if (name) toast(name);
+}
+
+// ════════════════════════════════════
+// Battery UI
+// ════════════════════════════════════
+function updateBattUI(side, pct) {
+  const s = side[0];
+  const bvEl  = gid('bv-'+s);
+  const bfEl  = gid('bf-'+s);
+  const fpbEl = gid('fpct-b'+s);
+
+  const txt  = pct!=null ? pct+' %' : '-- %';
+  const fill = pct!=null ? pct       : 0;
+
+  if (bvEl)  bvEl.textContent  = txt;
+  if (bfEl)  bfEl.style.height = fill + '%';
+  if (fpbEl) fpbEl.textContent = '🔋 ' + (pct!=null ? pct+'%' : '--%');
+}
+
+// ════════════════════════════════════
+// Shoe connect UI
+// ════════════════════════════════════
+function setShoeUI(side, state, name) {
+  const s     = side[0];
+  const connEl = gid('sc-conn-'+s);
+  const nameEl = gid('sc-name-'+s);
+  const btnEl  = gid('sc-btn-'+s);
+
+  if (state==='connecting') {
+    connEl.textContent='Connexion…'; connEl.style.color='#ff9f0a';
+    btnEl.innerHTML='<span class="spin"></span>';
+    btnEl.disabled=true;
+    btnEl.className='shoe-action';
+  } else if (state==='connected') {
+    connEl.textContent='Connected'; connEl.style.color='#30d158';
+    nameEl.textContent=name||side;
+    btnEl.textContent='Déconnecter';
+    btnEl.disabled=false;
+    btnEl.className='shoe-action connected';
+    btnEl.onclick=()=>shoes[side].disconnect();
+  } else {
+    connEl.textContent='Not Connected'; connEl.style.color='#aaa';
+    nameEl.textContent=side==='left'?'Gauche':'Droite';
+    btnEl.textContent='Connecter';
+    btnEl.disabled=false;
+    btnEl.className='shoe-action';
+    btnEl.onclick=()=>connectShoe(side);
+  }
+}
+
+// ════════════════════════════════════
+// Connect
+// ════════════════════════════════════
+async function connectShoe(side) {
+  if (!navigator.bluetooth) { toast('Utilise Chrome ou Bluefy'); return; }
+  try { await shoes[side].connect(); }
+  catch(e) {
+    if (e.name!=='NotFoundError') { log('err',`Connect: ${e.message}`); toast(`Erreur: ${e.message}`); }
+    setShoeUI(side,'off',null);
+  }
+}
+
+// ════════════════════════════════════
+// Discovery
+// ════════════════════════════════════
+function renderDisc(side, svcs) {
+  const el = gid('disc-log');
+  let html = `<div style="color:rgba(255,255,255,.7);margin-bottom:6px">${side==='left'?'Gauche':'Droite'} — ${svcs.length} service(s)</div>`;
+  for (const s of svcs) {
+    html += `<div style="font-family:monospace;font-size:.6rem;color:#5ac8fa;margin-top:6px">${s.uuid}</div>`;
+    for (const c of s.chars)
+      html += `<div style="font-family:monospace;font-size:.57rem;color:rgba(255,255,255,.5);padding-left:8px">└ ${c.uuid} [${c.props.join(',')}]</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════
+// Log
+// ════════════════════════════════════
+function log(type, msg) {
+  const el = gid('ble-log');
+  const d  = document.createElement('div');
+  const t  = new Date().toLocaleTimeString('fr-FR',{hour12:false});
+  d.className='ll '+type; d.textContent=`[${t}] ${msg}`;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+  while(el.children.length>120) el.removeChild(el.firstChild);
+}
+function clearLog() { gid('ble-log').innerHTML=''; }
+
+// ════════════════════════════════════
+// Manual auth probe
+// ════════════════════════════════════
+async function manualProbe(prefix) {
+  const targets = [shoes.left, shoes.right].filter(s => s.wChar);
+  if (!targets.length) { toast('Connecte d\'abord une chaussure'); return; }
+  for (const shoe of targets) {
+    const keyBytes = h2b(SHOE_DATA[shoe.side].authKey);
+    const prefBytes = prefix ? (prefix.split(' ').map(x=>parseInt(x,16))) : [];
+    const bytes = new Uint8Array([...prefBytes, ...keyBytes]);
+    log('tx', `[${shoe.label}] manualProbe[${prefix||'raw'}]: ${b2h(bytes)}`);
+    try { await shoe._write(bytes); } catch(e) { log('err',`Probe: ${e.message}`); }
+    await sleep(400);
+  }
+}
+
+function updateProbeStatus() {
+  const el = gid('probe-status');
+  if (el) el.textContent = `Step2 probe #${step2ProbeIndex}: "${STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length].label}"`;
+}
+
+function resetProbeIdx() {
+  step2ProbeIndex = 3;
+  localStorage.setItem('step2ProbeIdx', 3);
+  updateProbeStatus();
+  log('info', 'Probe index réinitialisé à #3');
+}
+
+function loadShoeKeys() {
+  const lk = gid('cfg-left-key'), rk = gid('cfg-right-key');
+  if (lk) lk.value = localStorage.getItem('shoe_left_authKey')  || '';
+  if (rk) rk.value = localStorage.getItem('shoe_right_authKey') || '';
+}
+
+function saveShoeKeys() {
+  const lv = (gid('cfg-left-key').value  || '').trim().toLowerCase();
+  const rv = (gid('cfg-right-key').value || '').trim().toLowerCase();
+  if (lv) localStorage.setItem('shoe_left_authKey',  lv);
+  if (rv) localStorage.setItem('shoe_right_authKey', rv);
+  toast('Clés sauvegardées ✓');
+  log('info', `Clé gauche: ${lv ? lv.slice(0,4)+'…' : '(vide)'}  Clé droite: ${rv ? rv.slice(0,4)+'…' : '(vide)'}`);
+}
+
+async function hardReload() {
+  log('info', 'Hard reload: suppression SW + caches...');
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) { await r.unregister(); }
+  }
+  const keys = await caches.keys();
+  for (const k of keys) { await caches.delete(k); }
+  location.reload(true);
+}
+
+// ════════════════════════════════════
+// Raw command
+// ════════════════════════════════════
+async function sendRaw() {
+  const hex = gid('raw-cmd').value.trim();
+  if (!hex) { toast('Entrez une commande hex'); return; }
+  let sent=false;
+  try {
+    if (shoes.left.connected)  { await shoes.left.sendRaw(hex);  sent=true; }
+    if (shoes.right.connected) { await shoes.right.sendRaw(hex); sent=true; }
+    toast(sent ? `✓ Envoyé: ${hex}` : 'Aucune chaussure connectée');
+  } catch(e) { toast(`Erreur: ${e.message}`); }
+}
+
+// ════════════════════════════════════
+// Hex utils
+// ════════════════════════════════════
+function h2b(hex) {
+  const s=(hex||'').replace(/[^0-9A-Fa-f]/g,'');
+  return new Uint8Array((s.match(/.{1,2}/g)||[]).map(x=>parseInt(x,16)));
+}
+function b2h(bytes) {
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+}
+
+// ════════════════════════════════════
+// Helpers
+// ════════════════════════════════════
+function gid(id) { return document.getElementById(id); }
+
+let _tt=null;
+function toast(msg) {
+  const el=gid('toast'); el.textContent=msg; el.classList.add('show');
+  if(_tt)clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2400);
+}
+
+// ════════════════════════════════════
+// Init
+// ════════════════════════════════════
+function init() {
+  applyBackground(currentLed);
+  fillCfg();
+
+  // Apply real shoe data to sliders
+  const maxL = SHOE_DATA.left.maxTightness;
+  const maxR = SHOE_DATA.right.maxTightness;
+  const slL  = gid('sl-left');
+  const slR  = gid('sl-right');
+  if (slL) { slL.max = maxL; slL.value = ST.left.fit; }
+  if (slR) { slR.max = maxR; slR.value = ST.right.fit; }
+  if (gid('max-l')) gid('max-l').textContent = maxL;
+  if (gid('max-r')) gid('max-r').textContent = maxR;
+  gid('fpct-l').textContent = ST.left.fit  + '%';
+  gid('fpct-r').textContent = ST.right.fit + '%';
+
+  if (!navigator.bluetooth) {
+    const w=gid('no-ble-warn'); if(w) w.style.display='block';
+    log('err','Web Bluetooth non supporté');
+  } else {
+    log('info','Web Bluetooth disponible ✓');
+    log('info',`Chaussures: ${SHOE_DATA.left.name} (${SHOE_DATA.left.colorway})`);
+    log('info',`Gauche  discoveryKey: ${SHOE_DATA.left.discoveryKey}  max: ${maxL}%`);
+    log('info',`Droite  discoveryKey: ${SHOE_DATA.right.discoveryKey}  max: ${maxR}%`);
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.update();
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'activated') location.reload();
+        });
+      });
+    }).catch(()=>{});
+  }
+
+  loadShoeKeys();
+  log('info', `App version: v22 — step2 probe #${step2ProbeIndex} (${STEP2_PROBES.length} probes total)`);
+  if (!SHOE_DATA.left.authKey || !SHOE_DATA.right.authKey)
+    log('info', '⚠️  Clés auth manquantes — configure-les dans Paramètres → Clés d\'authentification');
+}
+
+init();
+</script>
+</body>
+</html>
