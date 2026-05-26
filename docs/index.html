@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v24</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v25</span>
       </div>
     </div>
 
@@ -876,7 +876,7 @@ function resetProto() {
 // Step 2 probes — shoe responds C0 xx to step1, we must respond correctly
 // C0 xx responses always get C0 02 → trying non-C0 formats now
 // Tried: C0 01(echo)=FAIL, C0 91(XOR)=FAIL, C0 90(k[0])=FAIL
-let step2ProbeIndex = Math.max(3, parseInt(localStorage.getItem('step2ProbeIdx') ?? '3', 10));
+let step2ProbeIndex = Math.max(10, parseInt(localStorage.getItem('step2ProbeIdx') ?? '10', 10));
 const STEP2_PROBES = [
   { label: 'écho C0+c [FAIL]',       fn: (k,c) => new Uint8Array([0xC0, c]) },
   { label: 'XOR k[0]^c [FAIL]',      fn: (k,c) => new Uint8Array([0xC0, k[0]^c]) },
@@ -1519,7 +1519,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v24 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v25 — step2 probe #${step2ProbeIndex} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
