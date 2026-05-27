@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v34</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v35</span>
       </div>
     </div>
 
@@ -705,6 +705,10 @@
         <button class="cbtn" style="background:#16a085" onclick="jumpToProbe(61)">⚡ DEF #61</button>
         <button class="cbtn" style="background:#7f8c8d" onclick="hardReload()">⟳ Hard Reload SW</button>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+        <button class="cbtn" style="background:#1a6e9c;font-weight:700" onclick="runDHAuth()">🔑 DH Full Auth</button>
+        <button class="cbtn" style="background:#6c3483" onclick="jumpToProbe(71)">⚡ DH Probe #71</button>
+      </div>
     </div>
 
     <div class="gcard">
@@ -896,6 +900,48 @@ const DH_KEY_LEN = 128; // bytes for 1024-bit group
 function modPow(b, e, m) { let r=1n; b%=m; for(;e>0n;e>>=1n,b=b*b%m) if(e&1n) r=r*b%m; return r; }
 function bn2bytes(n, len) { const h=n.toString(16).padStart(len*2,'0'); return new Uint8Array(h.match(/../g).map(x=>parseInt(x,16))); }
 function bytes2bn(b) { return BigInt('0x'+Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('')); }
+
+// Pure-JS MD5 (Web Crypto doesn't expose MD5; needed for DH shared-secret key derivation)
+function md5bytes(data) {
+  const u32 = x => x >>> 0;
+  const rot  = (v,n) => u32((v<<n)|(v>>>(32-n)));
+  const K = [
+    0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,
+    0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,
+    0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,
+    0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,
+    0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,
+    0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,
+    0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,
+    0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391,
+  ];
+  const S = [7,12,17,22, 5,9,14,20, 4,11,16,23, 6,10,15,21];
+  const len = data.length;
+  const padLen = (Math.floor((len+8)/64)+1)*64;
+  const padded = new Uint8Array(padLen);
+  padded.set(data);
+  padded[len] = 0x80;
+  const dv = new DataView(padded.buffer);
+  dv.setUint32(padLen-8, (len*8)>>>0, true);
+  dv.setUint32(padLen-4, Math.floor(len/0x20000000), true);
+  let a0=0x67452301, b0=0xefcdab89, c0=0x98badcfe, d0=0x10325476;
+  for (let i=0; i<padLen; i+=64) {
+    const M = Array.from({length:16}, (_,j)=>dv.getUint32(i+j*4,true));
+    let a=a0,b=b0,c=c0,d=d0;
+    for (let j=0; j<64; j++) {
+      let F,g;
+      if      (j<16) { F=(b&c)|(~b&d); g=j; }
+      else if (j<32) { F=(d&b)|(~d&c); g=(5*j+1)%16; }
+      else if (j<48) { F=b^c^d;        g=(3*j+5)%16; }
+      else           { F=c^(b|~d);     g=(7*j)%16; }
+      F=u32(F+a+K[j]+M[g]); a=d; d=c; c=b; b=u32(b+rot(F,S[((j>>4)<<2)+(j&3)]));
+    }
+    a0=u32(a0+a); b0=u32(b0+b); c0=u32(c0+c); d0=u32(d0+d);
+  }
+  const out=new DataView(new ArrayBuffer(16));
+  [a0,b0,c0,d0].forEach((v,i)=>out.setUint32(i*4,v,true));
+  return new Uint8Array(out.buffer);
+}
 
 // Auth probe sequences (one per connection attempt)
 // ════════════════════════════════════
@@ -1309,9 +1355,118 @@ class NikeShoe {
   }
 
   async _write(bytes) {
-    this.wChar.properties.writeWithoutResponse
-      ? await this.wChar.writeValueWithoutResponse(bytes)
-      : await this.wChar.writeValue(bytes);
+    // writeValueWithoutResponse is MTU-limited (~20B); use writeValueWithResponse for large payloads
+    if (bytes.length <= 20 && this.wChar.properties.writeWithoutResponse) {
+      await this.wChar.writeValueWithoutResponse(bytes);
+    } else if (this.wChar.properties.write) {
+      await this.wChar.writeValueWithResponse(bytes);
+    } else {
+      await this.wChar.writeValueWithoutResponse(bytes);
+    }
+  }
+
+  // Wait for a single BLE notification (used by _authFullDH)
+  _waitNotif(ms) {
+    return Promise.race([
+      new Promise(r => { this._challengeResolve = r; }),
+      sleep(ms).then(() => null),
+    ]).finally(() => { this._challengeResolve = null; });
+  }
+
+  // Collect notifications until we accumulate `wantBytes` bytes of non-C0 payload
+  async _waitLargeNotif(wantBytes, timeoutMs=10000) {
+    const buf = [];
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const n = await this._waitNotif(Math.max(200, deadline - Date.now()));
+      if (!n) break;
+      if (n.opcode === 0xC0) { log('info',`[DH] C0 keepalive, waiting...`); continue; }
+      if (n.opcode === 0xFE && n.second === 0x02) { log('err','[DH] NACK FE02'); return null; }
+      if (n.opcode === 0xFE && n.second === 0x00) { this._authOK=true; return 'AUTH_OK'; }
+      // Accumulate all bytes
+      for (const byte of n.data) buf.push(byte);
+      log('info',`[DH] rx ${n.data.length}B, total=${buf.length}B: ${b2h(n.data)}`);
+      // TLV match: [opcode, len=wantBytes, payload…]
+      if (buf.length >= 2 && buf[1] === wantBytes && buf.length >= 2+wantBytes)
+        return new Uint8Array(buf.slice(2, 2+wantBytes));
+      // Raw match: exactly wantBytes accumulated (Ripley-reassembled payload without header)
+      if (buf.length >= wantBytes)
+        return new Uint8Array(buf.slice(0, wantBytes));
+    }
+    return null;
+  }
+
+  // Full DH Group2 handshake (alternative to probe-based _auth)
+  // Protocol: shoe→C0 01 → we send pubkey (130B) → shoe sends pubkey (128B reassembled)
+  //           → DH shared secret → MD5 → secretKey → AES-ECB nonce → FE 00
+  async _authFullDH() {
+    if (!this.wChar || !this.nChar) { log('err',`[DH:${this.label}] pas de characteristic`); return; }
+    this._authOK = false;
+    log('info',`[${this.label}] ══ Full DH Auth (Group2) ══`);
+
+    // Generate ephemeral DH Group2 keypair
+    const privRaw = crypto.getRandomValues(new Uint8Array(DH_KEY_LEN));
+    const privBn  = bytes2bn(privRaw);
+    const pubBn   = modPow(DH2_G, privBn, DH2_P);
+    const ourPub  = bn2bytes(pubBn, DH_KEY_LEN);
+    log('info',`[DH] ourPub[0..7]: ${b2h(ourPub.slice(0,8))}...`);
+
+    // Step A — wait for shoe's C0 01 (StartAuthKeyGen, modGroup=TWO)
+    log('info',`[DH] Waiting for C0 01...`);
+    const n0 = await this._waitNotif(8000);
+    if (!n0) { log('err','[DH] timeout waiting C0'); return; }
+    log('rx',`[DH] Got ${b2h(n0.data)}`);
+    if (n0.opcode !== 0xC0) { log('err',`[DH] expected C0, got ${n0.opcode.toString(16)}`); return; }
+
+    // Step B — send our DH pubkey: opcode=01, len=0x80, pub[128]  (130 bytes → writeValueWithResponse)
+    const dhMsg = new Uint8Array([0x01, DH_KEY_LEN, ...ourPub]);
+    log('tx',`[DH] pubkey ${dhMsg.length}B → ${b2h(dhMsg.slice(0,4))}...`);
+    try { await this.wChar.writeValueWithResponse(dhMsg); }
+    catch(e) { log('err',`[DH] writeValueWithResponse: ${e.message}`); return; }
+
+    // Step C — collect shoe's DH pubkey (may arrive as Ripley segments)
+    log('info',`[DH] Waiting for shoe pubkey (${DH_KEY_LEN}B)...`);
+    const shoePubResult = await this._waitLargeNotif(DH_KEY_LEN, 10000);
+    if (!shoePubResult || shoePubResult === 'AUTH_OK') {
+      log(shoePubResult==='AUTH_OK'?'rx':'err', shoePubResult==='AUTH_OK'?`[DH] Early FE00 AUTH OK`:`[DH] No shoe pubkey`);
+      return;
+    }
+    const shoePub = shoePubResult;
+    log('rx',`[DH] shoePub[0..7]: ${b2h(shoePub.slice(0,8))}... (${shoePub.length}B)`);
+
+    // Step D — DH shared secret
+    const shoePubBn  = bytes2bn(shoePub);
+    const sharedBn   = modPow(shoePubBn, privBn, DH2_P);
+    const sharedBytes = bn2bytes(sharedBn, DH_KEY_LEN);
+    log('info',`[DH] shared[0..7]: ${b2h(sharedBytes.slice(0,8))}...`);
+
+    // Step E — secretKey = MD5(sharedSecret)
+    const secretKey = md5bytes(sharedBytes);
+    log('info',`[DH] secretKey: ${b2h(secretKey)}`);
+
+    // Step F — encrypt a 12-byte random phoneNonce
+    const phoneNonce = crypto.getRandomValues(new Uint8Array(12));
+    const nonceBlock = new Uint8Array(16); // [0x00*4 + phoneNonce[12]]
+    nonceBlock.set(phoneNonce, 4);
+    const encNonce = await aesEcb(secretKey, nonceBlock);
+    log('info',`[DH] phoneNonce: ${b2h(phoneNonce)}`);
+    log('info',`[DH] encNonce:   ${b2h(encNonce)}`);
+
+    // Step G — send encrypted nonce: 01 10 + encNonce[16]
+    const authReq = new Uint8Array([0x01, 0x10, ...encNonce]);
+    log('tx',`[DH] AuthRequest → ${b2h(authReq)}`);
+    try { await this._write(authReq); } catch(e) { log('err',`[DH] write nonce: ${e.message}`); return; }
+
+    // Step H — wait for FE 00 (auth success) or FE 02 (NACK)
+    log('info',`[DH] Waiting for auth result...`);
+    const result = await this._waitNotif(8000);
+    if (result?.opcode === 0xFE && result.second === 0x00) {
+      this._authOK = true;
+      log('rx',`[${this.label}] ✅ DH AUTH OK!`);
+      toast(`✅ ${this.label} DH auth OK!`);
+    } else {
+      log('err',`[DH] Auth result: ${result ? b2h(result.data) : 'timeout'}`);
+    }
   }
 
   _notify(e) {
@@ -1579,6 +1734,16 @@ function jumpToProbe(n) {
   log('info', `⚡ Probe index → #${n}: "${STEP2_PROBES[n % STEP2_PROBES.length].label}"`);
 }
 
+async function runDHAuth() {
+  log('info', '🔑 Triggering Full DH Auth on connected shoes...');
+  for (const shoe of [shoes.left, shoes.right]) {
+    if (shoe?.device?.gatt?.connected && shoe.wChar && shoe.nChar) {
+      shoe._authFullDH().catch(e => log('err', `DH auth [${shoe.label}]: ${e.message}`));
+    } else {
+      log('info', `[${shoe?.label ?? '?'}] Not connected — skipping DH auth`);
+    }
+  }
+}
 
 async function hardReload() {
   log('info', 'Hard reload: suppression SW + caches...');
@@ -1669,7 +1834,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v34 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v35 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
