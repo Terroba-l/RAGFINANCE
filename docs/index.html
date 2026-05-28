@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v36</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v37</span>
       </div>
     </div>
 
@@ -1355,19 +1355,48 @@ class NikeShoe {
   }
 
   async _write(bytes) {
-    // Bluefy (iOS) may not support writeValueWithResponse; fall back through the API chain
-    // writeValueWithoutResponse is limited to MTU-3 bytes (~17-20B) — can't send 130B DH key
-    const ab = bytes.buffer instanceof ArrayBuffer ? bytes.buffer : bytes;
-    if (bytes.length <= 20 && this.wChar.properties.writeWithoutResponse) {
-      try { await this.wChar.writeValueWithoutResponse(bytes); return; } catch {}
-    }
-    // Prefer writeValueWithResponse (newer spec), fall back to writeValue (deprecated but works in Bluefy)
-    if (typeof this.wChar.writeValueWithResponse === 'function') {
-      try { await this.wChar.writeValueWithResponse(bytes); return; } catch(e) {
-        log('info',`[${this.label}] writeValueWithResponse failed (${e?.message}), trying writeValue`);
+    // Full write cascade — Bluefy on iOS does NOT support writeValueWithResponse
+    // iOS MTU is typically ~182B so writeValueWithoutResponse may handle large payloads directly
+    if (this.wChar.properties.writeWithoutResponse) {
+      try { await this.wChar.writeValueWithoutResponse(bytes); return; }
+      catch(e) {
+        if (bytes.length <= 20) throw e; // small payloads MUST succeed
+        log('info',`[${this.label}] writeWithoutResponse(${bytes.length}B): ${e?.message ?? e}`);
       }
     }
-    await this.wChar.writeValue(ab); // deprecated but universally supported
+    if (typeof this.wChar.writeValueWithResponse === 'function') {
+      try { await this.wChar.writeValueWithResponse(bytes); return; }
+      catch(e) { log('info',`[${this.label}] writeValueWithResponse: ${e?.message ?? e}`); }
+    }
+    const ab = bytes.buffer instanceof ArrayBuffer ? bytes.buffer : bytes;
+    try { await this.wChar.writeValue(ab); return; }
+    catch(e) {
+      log('info',`[${this.label}] writeValue(${bytes.length}B): ${e?.message ?? e}`);
+      if (bytes.length <= 20) throw e;
+    }
+    // All BLE-level writes failed for large payload → Ripley application-layer segmentation
+    // Strip single-segment Ripley header (0x01) if already present, then re-fragment
+    log('info',`[${this.label}] → Ripley segmentation for ${bytes.length}B`);
+    const inner = (bytes.length > 1 && bytes[0] === 0x01) ? bytes.slice(1) : bytes;
+    await this._writeRipley(inner);
+  }
+
+  // Ripley application-layer segmentation: fragment innerPayload into BLE-sized chunks
+  // Each chunk: header = (segIndex << 1) | lastBit, then up to chunkSize payload bytes
+  // Matches the Bigfoot.framework/CoreRF Ripley transport seen in the iOS binary
+  async _writeRipley(innerPayload, chunkSize = 19) {
+    const total = innerPayload.length;
+    const nChunks = Math.max(1, Math.ceil(total / chunkSize));
+    log('tx',`[Ripley] ${total}B → ${nChunks} segments (chunkSize=${chunkSize})`);
+    for (let i = 0; i < nChunks; i++) {
+      const isLast = i === nChunks - 1;
+      const hdr  = (i << 1) | (isLast ? 1 : 0);
+      const chunk = innerPayload.slice(i * chunkSize, (i + 1) * chunkSize);
+      const pkt   = new Uint8Array([hdr, ...chunk]);
+      log('tx',`[Ripley] seg${i}/${nChunks-1} ${b2h(pkt)}`);
+      await this.wChar.writeValueWithoutResponse(pkt);
+      if (!isLast) await sleep(15); // small gap between segments for BLE stability
+    }
   }
 
   // Wait for a single BLE notification (used by _authFullDH)
@@ -1378,25 +1407,59 @@ class NikeShoe {
     ]).finally(() => { this._challengeResolve = null; });
   }
 
-  // Collect notifications until we accumulate `wantBytes` bytes of non-C0 payload
+  // Collect notifications until we reassemble wantBytes of payload
+  // Handles both Ripley-segmented responses (multiple small notifs) and single large notifs
+  // Ripley incoming format: byte0 = (segIndex<<1)|lastBit, rest = chunk
+  // Known standalone opcodes (not Ripley): C0, FE, E8, E3, 03
   async _waitLargeNotif(wantBytes, timeoutMs=10000) {
-    const buf = [];
+    const STANDALONE = new Set([0xC0, 0xFE, 0xE8, 0xE3, 0x03]);
+    const inner = [];  // reassembled inner payload (Ripley-stripped or raw)
+    let ripleyMode = false;
     const deadline = Date.now() + timeoutMs;
+
     while (Date.now() < deadline) {
       const n = await this._waitNotif(Math.max(200, deadline - Date.now()));
       if (!n) break;
-      if (n.opcode === 0xC0) { log('info',`[DH] C0 keepalive, waiting...`); continue; }
-      if (n.opcode === 0xFE && n.second === 0x02) { log('err','[DH] NACK FE02'); return null; }
-      if (n.opcode === 0xFE && n.second === 0x00) { this._authOK=true; return 'AUTH_OK'; }
-      // Accumulate all bytes
-      for (const byte of n.data) buf.push(byte);
-      log('info',`[DH] rx ${n.data.length}B, total=${buf.length}B: ${b2h(n.data)}`);
-      // TLV match: [opcode, len=wantBytes, payload…]
-      if (buf.length >= 2 && buf[1] === wantBytes && buf.length >= 2+wantBytes)
-        return new Uint8Array(buf.slice(2, 2+wantBytes));
-      // Raw match: exactly wantBytes accumulated (Ripley-reassembled payload without header)
-      if (buf.length >= wantBytes)
-        return new Uint8Array(buf.slice(0, wantBytes));
+      const b = n.data;
+
+      // Standalone protocol messages (never Ripley-wrapped)
+      if (STANDALONE.has(b[0]) && !ripleyMode) {
+        if (b[0] === 0xC0) { log('info',`[DH] C0 ${b2h(b.slice(1))}, waiting...`); continue; }
+        if (b[0] === 0xFE && b[1] === 0x02) { log('err','[DH] FE02 NACK'); return null; }
+        if (b[0] === 0xFE && b[1] === 0x00) { this._authOK=true; return 'AUTH_OK'; }
+        log('info',`[DH] standalone ${b2h(b)}`); continue;
+      }
+
+      // Single large notification (MTU ≥ wantBytes+2): [opcode, len, payload...]
+      if (!ripleyMode && b.length >= 2 + wantBytes && b[1] === wantBytes) {
+        log('rx',`[DH] single notif ${b.length}B: ${b2h(b.slice(0,4))}...`);
+        return b.slice(2, 2 + wantBytes);
+      }
+      // Raw single notification (just the key bytes)
+      if (!ripleyMode && b.length >= wantBytes) {
+        log('rx',`[DH] raw single notif ${b.length}B`);
+        return b.slice(0, wantBytes);
+      }
+
+      // Ripley segment: hdr = (segIdx<<1)|lastBit
+      const hdr = b[0]; const isLast = !!(hdr & 1); const segIdx = hdr >> 1;
+      const chunk = b.slice(1);
+      if (segIdx === 0) { inner.length = 0; ripleyMode = true; } // new message
+      for (const byte of chunk) inner.push(byte);
+      log('info',`[DH] Ripley seg${segIdx} ${isLast?'LAST':''} ${chunk.length}B, total=${inner.length}B`);
+
+      if (isLast) {
+        ripleyMode = false;
+        const payload = new Uint8Array(inner);
+        log('rx',`[DH] Ripley reassembled ${payload.length}B: ${b2h(payload.slice(0,4))}...`);
+        // [len, key...] format
+        if (payload.length >= 1 + wantBytes && payload[0] === wantBytes)
+          return payload.slice(1, 1 + wantBytes);
+        // raw format
+        if (payload.length >= wantBytes)
+          return payload.slice(0, wantBytes);
+        log('err',`[DH] reassembled ${payload.length}B but need ${wantBytes}`);
+      }
     }
     return null;
   }
@@ -1433,9 +1496,10 @@ class NikeShoe {
     log('rx',`[DH] Got ${b2h(n0.data)}`);
     if (n0.opcode !== 0xC0) { log('err',`[DH] expected C0, got ${n0.opcode.toString(16)}`); return; }
 
-    // Step B — send our DH pubkey: opcode=01, len=0x80, pub[128]  (130 bytes)
-    // Uses _write() which tries writeValueWithResponse then falls back to writeValue()
-    const dhMsg = new Uint8Array([0x01, DH_KEY_LEN, ...ourPub]);
+    // Step B — send our DH pubkey via _write which cascades through all methods
+    // including Ripley segmentation (7 × ≤20B packets) as final fallback
+    // Inner payload: [0x80=128, pub128] — same TLV pattern as step1 [0x10=16, key16]
+    const dhMsg = new Uint8Array([0x01, DH_KEY_LEN, ...ourPub]); // Ripley single-seg header + inner
     log('tx',`[DH] pubkey ${dhMsg.length}B → ${b2h(dhMsg.slice(0,4))}...`);
     try { await this._write(dhMsg); }
     catch(e) { log('err',`[DH] write pubkey failed: ${e?.message ?? e}`); return; }
@@ -1856,7 +1920,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v36 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v37 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
