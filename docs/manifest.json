@@ -1,7 +1,7 @@
 {
-  "name": "Nike Adapt",
-  "short_name": "Nike Adapt",
-  "description": "Nike Adapt BB 2.0 – Fit Controller",
+  "name": "Nike Adapt Auto Max",
+  "short_name": "Adapt AutoMax",
+  "description": "Nike Adapt AutoMax – BLE Fit Controller",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
