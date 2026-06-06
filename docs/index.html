@@ -384,7 +384,7 @@
         <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
           <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
         </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v37</span>
+        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v38</span>
       </div>
     </div>
 
@@ -705,9 +705,15 @@
         <button class="cbtn" style="background:#16a085" onclick="jumpToProbe(61)">⚡ DEF #61</button>
         <button class="cbtn" style="background:#7f8c8d" onclick="hardReload()">⟳ Hard Reload SW</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
         <button class="cbtn" style="background:#1a6e9c;font-weight:700" onclick="runDHAuth()">🔑 DH Full Auth</button>
-        <button class="cbtn" style="background:#6c3483" onclick="jumpToProbe(71)">⚡ DH Probe #71</button>
+        <button class="cbtn" style="background:#6c3483" onclick="jumpToProbe(71)">⚡ DH #71</button>
+        <button class="cbtn" style="background:#1e8449" onclick="jumpToProbe(74)">⚡ B11 #74</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+        <button class="cbtn" style="background:#b7770d" onclick="jumpToProbe(82)">⚡ Ripley #82</button>
+        <button class="cbtn" style="background:#922b21" onclick="jumpToProbe(86)">⚡ Chall #86</button>
+        <button class="cbtn" style="background:#4a235a" onclick="jumpToProbe(93)">⚡ Hash #93</button>
       </div>
     </div>
 
@@ -1140,6 +1146,78 @@ const STEP2_PROBES = [
       log('info',`[DH] Full exchange attempt — pubkey[0..3]: ${b2h(pub.slice(0,4))}...`);
       return new Uint8Array([0x01, DH_KEY_LEN, ...pub]);
   }},
+
+  // ── Batch 11 : SESSION layer (bit7=1) — FuelBand/Copperhead analogy ─────
+  // FuelBand uses 0x90 (SESSION, seq=1) for auth initiation; shoe responds 0xC0.
+  // Testing if Adapt shoe also expects SESSION-layer commands from phone.
+  { label: 'B11 80 10 authKey',          fn: async (k,c) => new Uint8Array([0x80,0x10,...k]) },
+  { label: 'B11 90 10 authKey',          fn: async (k,c) => new Uint8Array([0x90,0x10,...k]) },
+  { label: 'B11 A0 10 authKey',          fn: async (k,c) => new Uint8Array([0xA0,0x10,...k]) },
+  { label: 'B11 B0 10 authKey',          fn: async (k,c) => new Uint8Array([0xB0,0x10,...k]) },
+  { label: 'B11 80 01 01 zeros',         fn: async (k,c) => { const b=new Uint8Array(19);b[0]=0x80;b[1]=0x01;b[2]=0x01;return b; } },
+  { label: 'B11 90 01 01 zeros (FB)',    fn: async (k,c) => { const b=new Uint8Array(19);b[0]=0x90;b[1]=0x01;b[2]=0x01;return b; } },
+  { label: 'B11 80 00 00',              fn: async (k,c) => new Uint8Array([0x80,0x00,0x00]) },
+  { label: 'B11 C0 01 00 (echo)',       fn: async (k,c) => new Uint8Array([0xC0,0x01,0x00]) },
+
+  // ── Batch 12 : DH pubkey via real Ripley segmentation ────────────────────
+  // These use shoe._writeRipley directly (3rd arg = shoe) and return 'sent'.
+  // Tests different inner payload formats for ExchangePublicKey.
+  { label: 'B12 Ripley DH raw pub128', fn: async (k,c,shoe) => {
+      const priv=bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pub=bn2bytes(modPow(DH2_G,priv,DH2_P),DH_KEY_LEN);
+      window._dhPriv=priv;
+      log('info',`[DH] Ripley raw pub[0..4]: ${b2h(pub.slice(0,4))}...`);
+      await shoe._writeRipley(pub); // inner = raw 128B key, no prefix
+      return 'sent';
+  } },
+  { label: 'B12 Ripley DH [len,pub]',  fn: async (k,c,shoe) => {
+      const priv=bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pub=bn2bytes(modPow(DH2_G,priv,DH2_P),DH_KEY_LEN);
+      window._dhPriv=priv;
+      log('info',`[DH] Ripley [0x80,pub][0..4]: ${b2h(pub.slice(0,4))}...`);
+      await shoe._writeRipley(new Uint8Array([DH_KEY_LEN,...pub])); // [0x80, pub128]
+      return 'sent';
+  } },
+  { label: 'B12 Ripley DH [02,len,pub]', fn: async (k,c,shoe) => {
+      const priv=bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pub=bn2bytes(modPow(DH2_G,priv,DH2_P),DH_KEY_LEN);
+      window._dhPriv=priv;
+      await shoe._writeRipley(new Uint8Array([0x02,DH_KEY_LEN,...pub])); // opcode 02
+      return 'sent';
+  } },
+  { label: 'B12 Ripley DH [03,len,pub]', fn: async (k,c,shoe) => {
+      const priv=bytes2bn(crypto.getRandomValues(new Uint8Array(DH_KEY_LEN)));
+      const pub=bn2bytes(modPow(DH2_G,priv,DH2_P),DH_KEY_LEN);
+      window._dhPriv=priv;
+      await shoe._writeRipley(new Uint8Array([0x03,DH_KEY_LEN,...pub])); // opcode 03
+      return 'sent';
+  } },
+
+  // ── Batch 13 : Challenge byte incorporation ───────────────────────────────
+  // Challenge byte c comes from C0 c (= 0x01 in our observations so far).
+  // Testing different ways to fold the challenge into the auth response.
+  { label: 'B13 ECB(key,[c,0*3,rnd12])',fn: async (k,c) => {
+      const n=new Uint8Array(16);n[0]=c;crypto.getRandomValues(n.subarray(4));
+      return new Uint8Array([0x01,0x10,...await aesEcb(k,n)]); } },
+  { label: 'B13 ECB(key,[c*4,rnd12])', fn: async (k,c) => {
+      const n=new Uint8Array(16);n.fill(c,0,4);crypto.getRandomValues(n.subarray(4));
+      return new Uint8Array([0x01,0x10,...await aesEcb(k,n)]); } },
+  { label: 'B13 01 11 [c,key]',        fn: async (k,c) => new Uint8Array([0x01,0x11,c,...k]) },
+  { label: 'B13 00 10 authKey',        fn: async (k,c) => new Uint8Array([0x00,0x10,...k]) },
+  { label: 'B13 03 10 authKey',        fn: async (k,c) => new Uint8Array([0x03,0x10,...k]) },
+  { label: 'B13 04 10 authKey',        fn: async (k,c) => new Uint8Array([0x04,0x10,...k]) },
+  { label: 'B13 05 10 authKey',        fn: async (k,c) => new Uint8Array([0x05,0x10,...k]) },
+
+  // ── Batch 14 : Hash/XOR transforms of authKey ────────────────────────────
+  // FuelBand used CRC32; Adapt upgraded to AES+DH. Testing intermediate variants.
+  { label: 'B14 01 10 MD5(key)',        fn: async (k,c) => new Uint8Array([0x01,0x10,...md5bytes(k)]) },
+  { label: 'B14 01 10 MD5(key+c)',      fn: async (k,c) => new Uint8Array([0x01,0x10,...md5bytes(new Uint8Array([...k,c]))]) },
+  { label: 'B14 01 10 key XOR c',      fn: async (k,c) => new Uint8Array([0x01,0x10,...k.map(b=>b^c)]) },
+  { label: 'B14 ECB(MD5(key),[0*4+rnd])', fn: async (k,c) => {
+      const sk=md5bytes(k);const n=new Uint8Array(16);crypto.getRandomValues(n.subarray(4));
+      return new Uint8Array([0x01,0x10,...await aesEcb(sk,n)]); } },
+  { label: 'B14 ECB(DEF1,authKey)',    fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_1,k)]) },
+  { label: 'B14 ECB(DEF2,authKey)',    fn: async (k,c) => new Uint8Array([0x01,0x10,...await aesEcb(DEFAULT_KEY_2,k)]) },
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1267,12 +1345,14 @@ class NikeShoe {
       updateProbeStatus();
 
       let step2bytes;
-      try { step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge); }
+      try { step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge, this); }
       catch(e) { log('err', `[${this.label}] Probe fn: ${e.message}`); } // undefined → skip
 
-      if (step2bytes) {
+      if (step2bytes instanceof Uint8Array && step2bytes.length > 0) {
         log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
         try { await this._write(step2bytes); } catch { if (!this.device?.gatt?.connected) break; }
+      } else if (step2bytes === 'sent') {
+        log('info', `[${this.label}] Step2: Ripley probe already sent, waiting shoe response...`);
       } else if (step2bytes === null) {
         log('info', `[${this.label}] Step2: aucun envoi, attente 15s...`);
         await sleep(15000);
@@ -1920,7 +2000,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v37 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v38 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
 }
 
 init();
