@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Mathias — Programme Lutte</title>
+<link rel="manifest" href="planning-manifest.json">
+<meta name="theme-color" content="#07070f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Prog Mathias">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07070f;--bg2:#0d0d1a;--bg3:#14142a;--bg4:#1a1a33;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --text:#ececf4;--dim:rgba(236,236,244,0.45);--dim2:rgba(236,236,244,0.25);
+  --red:#e63946;--red2:#ff4d5a;--orange:#ff6b35;
+  --force:#7c5cfc;--force-bg:rgba(124,92,252,0.12);
+  --explo:#ff6b35;--explo-bg:rgba(255,107,53,0.12);
+  --lact:#e63946;--lact-bg:rgba(230,57,70,0.12);
+  --plyo:#30d158;--plyo-bg:rgba(48,209,88,0.12);
+  --endu:#ff9f0a;--endu-bg:rgba(255,159,10,0.12);
+  --r:16px
+}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ─────────────────────────────── */
+.header{padding:36px 28px 0;max-width:1440px;margin:0 auto}
+.header-row{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.athlete{font-size:clamp(44px,9vw,96px);font-weight:900;line-height:.95;letter-spacing:-3px;background:linear-gradient(135deg,#fff 30%,rgba(255,255,255,.45));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.discipline{background:var(--red);color:#fff;font-size:10px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;padding:7px 16px;border-radius:100px;align-self:flex-end;margin-bottom:6px}
+.stats{display:flex;gap:28px;margin-top:14px;flex-wrap:wrap}
+.stat-val{font-size:32px;font-weight:900;color:var(--red);line-height:1}
+.stat-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-top:2px}
+.divider{width:100%;height:1px;background:var(--border);margin-top:28px}
+
+/* ── WEEK TOGGLE ─────────────────────────── */
+.controls{max-width:1440px;margin:24px auto 0;padding:0 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.week-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);font:600 13px/1 inherit;padding:10px 22px;border-radius:100px;cursor:pointer;transition:.18s all;letter-spacing:.3px}
+.week-btn:hover:not(.active){border-color:var(--border2);color:var(--text)}
+.week-btn.active{background:var(--red);border-color:var(--red);color:#fff}
+.load-bar{display:flex;gap:4px;margin-left:auto;align-items:center}
+.load-seg{height:6px;border-radius:3px;transition:width .4s}
+
+/* ── CALENDAR ────────────────────────────── */
+.calendar{max-width:1440px;margin:20px auto 0;padding:0 28px 80px;display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
+@media(max-width:1024px){.calendar{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:640px){.calendar{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 16px 80px}}
+
+.day-col{display:flex;flex-direction:column;gap:8px}
+.day-head{padding:2px 0 6px}
+.day-name{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+.day-num{font-size:20px;font-weight:900;color:var(--text);line-height:1}
+
+/* ── SESSION CARD ────────────────────────── */
+.s-card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 14px;cursor:pointer;overflow:hidden;transition:.2s transform,.2s border-color,.2s background;min-height:180px;display:flex;flex-direction:column}
+.s-card::after{content:'';position:absolute;inset:0;opacity:0;transition:.2s opacity;border-radius:var(--r)}
+.s-card:hover{transform:translateY(-3px);border-color:var(--border2);background:var(--bg3)}
+.s-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:var(--r) 0 0 var(--r)}
+
+.s-card.force::before{background:var(--force)}
+.s-card.explosivite::before{background:var(--explo)}
+.s-card.lactique::before{background:var(--lact)}
+.s-card.plyo::before{background:var(--plyo)}
+.s-card.endurance::before{background:var(--endu)}
+
+.s-badge{display:inline-flex;align-items:center;font-size:8px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:3px 9px;border-radius:100px;margin-bottom:10px;width:fit-content}
+.force .s-badge{background:var(--force-bg);color:var(--force)}
+.explosivite .s-badge{background:var(--explo-bg);color:var(--explo)}
+.lactique .s-badge{background:var(--lact-bg);color:var(--lact)}
+.plyo .s-badge{background:var(--plyo-bg);color:var(--plyo)}
+.endurance .s-badge{background:var(--endu-bg);color:var(--endu)}
+
+.s-icon{font-size:22px;margin-bottom:8px;display:block}
+.s-title{font-size:13px;font-weight:800;line-height:1.3;color:var(--text);flex:1}
+.s-sub{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.4}
+.s-footer{display:flex;align-items:center;gap:6px;margin-top:14px}
+.s-dots{display:flex;gap:3px}
+.s-dot{width:5px;height:5px;border-radius:50%;background:var(--border2)}
+.force .s-dot.on{background:var(--force)}
+.explosivite .s-dot.on{background:var(--explo)}
+.lactique .s-dot.on{background:var(--lact)}
+.plyo .s-dot.on{background:var(--plyo)}
+.endurance .s-dot.on{background:var(--endu)}
+.s-dur{font-size:10px;font-weight:700;color:var(--dim);margin-left:auto}
+
+/* ── REST CARD ───────────────────────────── */
+.rest-card{border:1px dashed var(--border);border-radius:var(--r);min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:.45}
+.rest-icon{font-size:28px}
+.rest-lbl{font-size:9px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:var(--dim)}
+
+/* ── DETAIL PANEL ────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;opacity:0;pointer-events:none;transition:.25s opacity}
+.overlay.open{opacity:1;pointer-events:all}
+.panel{position:fixed;right:0;top:0;bottom:0;width:min(540px,100vw);background:var(--bg2);border-left:1px solid var(--border);z-index:201;overflow-y:auto;transform:translateX(100%);transition:.32s transform cubic-bezier(.4,0,.2,1)}
+.panel.open{transform:translateX(0)}
+.panel::-webkit-scrollbar{width:3px}
+.panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
+
+.p-head{padding:28px 28px 20px;position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);z-index:1}
+.p-close{width:34px;height:34px;border-radius:50%;background:var(--bg4);border:1px solid var(--border);color:var(--text);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:18px;transition:.15s}
+.p-close:hover{background:rgba(255,255,255,.1)}
+.p-badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;margin-bottom:10px}
+.p-title{font-size:24px;font-weight:900;line-height:1.15;letter-spacing:-.5px;margin-bottom:6px}
+.p-sub{font-size:13px;color:var(--dim);margin-bottom:16px}
+.p-chips{display:flex;gap:7px;flex-wrap:wrap}
+.p-chip{background:var(--bg4);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--dim);display:flex;align-items:center;gap:5px}
+
+.p-body{padding:22px 28px 40px}
+.sec-lbl{font-size:9px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.warmup-box{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:24px}
+.warmup-box li{font-size:12.5px;color:var(--dim);line-height:1.7;padding-left:14px;position:relative}
+.warmup-box li::before{content:'–';position:absolute;left:0;color:var(--dim2)}
+
+.bloc{margin-bottom:18px}
+.bloc-hd{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bloc-n{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;color:#fff}
+.bloc-nm{font-size:13px;font-weight:800;color:var(--text);flex:1}
+.bloc-s{font-size:11px;font-weight:700;color:var(--dim);background:var(--bg4);border-radius:100px;padding:2px 9px}
+.ex-list{display:flex;flex-direction:column;gap:5px;padding-left:36px}
+.ex-item{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 13px}
+.ex-name{font-size:12.5px;font-weight:700;color:var(--text);line-height:1.3}
+.ex-det{font-size:11px;color:var(--dim);margin-top:2px;line-height:1.4}
+
+.note-box{background:linear-gradient(135deg,rgba(124,92,252,.08),rgba(230,57,70,.08));border:1px solid rgba(124,92,252,.18);border-radius:12px;padding:14px 16px;margin-top:20px}
+.note-title{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--force);margin-bottom:8px}
+.note-text{font-size:12.5px;color:var(--dim);line-height:1.65}
+
+.cooldown-box{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-top:8px}
+.cooldown-box p{font-size:12.5px;color:var(--dim);line-height:1.65}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div class="athlete">MATHIAS</div>
+    <div class="discipline">Lutte Gréco-Romaine</div>
+  </div>
+  <div class="stats">
+    <div><div class="stat-val">12</div><div class="stat-lbl">Séances</div></div>
+    <div><div class="stat-val">2</div><div class="stat-lbl">Semaines</div></div>
+    <div><div class="stat-val">6/7</div><div class="stat-lbl">Jours actifs</div></div>
+    <div><div class="stat-val">~840</div><div class="stat-lbl">Min / Cycle</div></div>
+  </div>
+  <div class="divider"></div>
+</div>
+
+<div class="controls">
+  <button class="week-btn active" id="btn1" onclick="showWeek(1)">Semaine 1</button>
+  <button class="week-btn" id="btn2" onclick="showWeek(2)">Semaine 2</button>
+</div>
+
+<div class="calendar" id="calendar"></div>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="p-head" id="pHead"></div>
+  <div class="p-body" id="pBody"></div>
+</div>
+
+<script>
+const TYPE = {
+  force:      { label:'Force',       color:'var(--force)', bg:'var(--force-bg)' },
+  explosivite:{ label:'Explosivité', color:'var(--explo)',  bg:'var(--explo-bg)' },
+  lactique:   { label:'Lactique',    color:'var(--lact)',   bg:'var(--lact-bg)' },
+  plyo:       { label:'Plyométrie',  color:'var(--plyo)',   bg:'var(--plyo-bg)' },
+  endurance:  { label:'Endurance',   color:'var(--endu)',   bg:'var(--endu-bg)' }
+};
+
+const SESSIONS = {
+  force2: {
+    id:'force2', title:'Force – Hypertrophie Lutte', subtitle:'Tirage front · SDT Azeri · Tractions lestées',
+    type:'force', icon:'🏋️', intensity:5, duration:'80 min',
+    warmup:['Mobilité : cervicale, scapulaire, thoracique','Activation : bandes élastiques + rotations épaules','2-3 séries légères de chaque exercice avec charges réduites'],
+    blocs:[
+      { name:'Tirage frontal & Rowing', series:'5 tours',
+        ex:[{n:'Tirage front sur banc (barre ou haltères)',d:'5 reps'},{n:'Tirage rowing avec serviette',d:'6 reps'}] },
+      { name:'SDT AZERI', series:'Volume progressif',
+        ex:[{n:'SDT',d:'Barre 20 kg → 70 reps'},{n:'SDT',d:'Barre 30 kg → 50 reps'},{n:'SDT',d:'Barre 40 kg → 30 reps'}] },
+      { name:'Zercher & Med Ball', series:'5 tours',
+        ex:[{n:'Zercher sur chaise romaine',d:'5 reps'},{n:'Maintien med ball "saisie papillon"',d:'20 sec'}] },
+      { name:'Prise alternée & Ball Slam', series:'4 séries',
+        ex:[{n:'Prise alternée barre 35 kg',d:'30 reps'},{n:'Half Kneeling Ball Slam',d:'6 reps (3G / 3D)'}] },
+      { name:'Tractions lestées', series:'3 séries',
+        ex:[{n:'Tractions lestées',d:'8 reps lourdes'}] }
+    ],
+    cooldown:'5 min tapis de course léger — Étirements le soir uniquement (pas juste après la séance)',
+    notes:null
+  },
+
+  explosivite1: {
+    id:'explosivite1', title:'Explosivité – BM Performance', subtitle:'Force maximale · Plyométrie · Réactivité neuromusculaire',
+    type:'explosivite', icon:'⚡', intensity:4, duration:'70 min',
+    warmup:['Mobilité articulaire : chevilles, hanches, épaules','Activation dynamique : jumping jacks, squats, fentes','2 séries légères à 40-50 % du max','1 série plyométrie basse intensité (sauts sur place)'],
+    blocs:[
+      { name:'Force & Puissance', series:'5 tours',
+        ex:[{n:'Soulevé de terre sumo',d:'5 reps @ 80 % du 1RM'},{n:'Kettlebell Snatch (alterné ou unilatéral)',d:'6 reps — focus : puissance des hanches + gainage'}] },
+      { name:'Renforcement Dynamique', series:'5 séries / superset',
+        ex:[{n:'Rowing barre ou haltères (explosif)',d:'5 reps'},{n:'Lancers med ball au sol (slam)',d:'6 reps'},{n:'Dips lestés',d:'5 reps (ou poids du corps)'},{n:'Tractions australiennes explosives',d:'6 reps — tempo explosif'}] },
+      { name:'Pecs & Core', series:'5 tours',
+        ex:[{n:'Développé couché au sol haltères, hanches en extension',d:'5 reps — activation tronc + fessiers'},{n:'Tirage câble unilatéral ou horizontal (arm-drag)',d:'6 reps'}] },
+      { name:'Plyométrie & Spécifique', series:'3-4 séries de chaque',
+        ex:[{n:'Décélérations contrôlées',d:'8-10 reps (sprint court + arrêt net)'},{n:'Sauts avec rebond simple',d:'5-8 reps (box jump + retombée réactive)'},{n:'Multi-rebonds enchaînés',d:'5-8 reps (sauts pieds joints ou fentes bondissantes)'},{n:'Rebonds spécifiques discipline',d:'5-8 reps (déplacements latéraux + changement d\'appui)'}] }
+    ],
+    cooldown:'Repos entre blocs : 1\'30 à 2\' max — Retour au calme + étirements dynamiques',
+    notes:'Prioriser la qualité d\'exécution à l\'intensité absolue. S\'hydrater tout au long de la séance.'
+  },
+
+  lactique2: {
+    id:'lactique2', title:'Anaérobie Lactique', subtitle:'Tapis de course · Assault Bike · Intervals',
+    type:'lactique', icon:'🔥', intensity:5, duration:'50 min',
+    warmup:['2 tours de piste ou 5 min de vélo'],
+    blocs:[
+      { name:'Tapis de course', series:'15 répétitions',
+        ex:[{n:'Sprint',d:'15 × (30 sec sprint / 30 sec repos) en vitesse 12-14 — descendre si trop difficile'}] },
+      { name:'Assault Bike ou Vélo', series:'2 blocs',
+        ex:[{n:'Bloc intensité modérée',d:'2 × 8 min (15 sec effort / 30 sec repos)'},{n:'Bloc sprint court',d:'2 × (10 × (7 sec sprint / 3 sec lent))'}] }
+    ],
+    cooldown:'Étirements des ischio-jambiers',
+    notes:null
+  },
+
+  endurance5: {
+    id:'endurance5', title:'Force Endurance + Circuit Géorgien', subtitle:'Supersets KB · Circuit Métabolique Lado.K',
+    type:'endurance', icon:'💪', intensity:4, duration:'80 min',
+    warmup:['Échauffement bulgare avec charges de 2 à 4 kg','Barre de 20 kg pour activation musculaire avant circuit'],
+    blocs:[
+      { name:'Force Endurance', series:'4 séries / superset',
+        ex:[{n:'Développé couché Kettlebell + Tirages alternés KB',d:'8 reps + 20 reps'},{n:'Pull-over + Dips lestés',d:'8 reps + 10 reps'},{n:'Good Morning sumo + Isométrie barre pronation/supination',d:'8 reps + 20 sec'}] },
+      { name:'Circuit Géorgien – Bloc A (Épaules & Dos)', series:'1 à 2 matchs (6 min/match)',
+        ex:[{n:'Élévations épaules pronation',d:'30 sec'},{n:'Développé militaire face',d:'30 sec'},{n:'Tirage pronation',d:'30 sec'},{n:'Tirage bas du dos',d:'30 sec'},{n:'Mouvements circulaires moulin en pronation',d:'30 sec'},{n:'Élévations épaules pronation',d:'30 sec'}] },
+      { name:'Circuit Géorgien – Bloc B (Bras & Épaules post.)', series:'Après 1 min repos',
+        ex:[{n:'Curl biceps',d:'30 sec'},{n:'Tirage supination',d:'30 sec'},{n:'Développé arrière d\'épaules',d:'30 sec'},{n:'Tirage bas du dos supination',d:'30 sec'},{n:'Moulin',d:'1 min'}] }
+    ],
+    cooldown:'Étirements ciblés',
+    notes:'1 match si niveau de fatigue élevé, 2 matchs si bonne forme. Matériel circuit : barre 20 kg.'
+  },
+
+  fullbody7: {
+    id:'fullbody7', title:'Full Body – Puissance & Explosivité', subtitle:'Arraché · Pliométrie · Med Ball',
+    type:'explosivite', icon:'💥', intensity:4, duration:'90 min',
+    warmup:['5 à 10 min de cardio modéré (corde, rameur ou vélo)','Mobilisation articulaire complète (épaules, hanches, genoux)','1 série légère de chaque mouvement (barre vide, poids du corps)'],
+    blocs:[
+      { name:'Poussée & Pliométrie', series:'Repos 60-90 sec',
+        ex:[{n:'Développé couché avec haltères',d:'15 – 12 – 10 – 10 reps @ ~70 % du max'},{n:'Pompes "Beterbiev" (explosives, tempo saccadé)',d:'4 × 10 reps'}] },
+      { name:'Explosivité Tronc / Hanches', series:'Repos 60-90 sec',
+        ex:[{n:'Arraché à la barre (Snatch)',d:'4 × 4 reps — barre sous tension sur toute l\'amplitude'},{n:'Tours de hanches avec élastique',d:'4 × 8 reps — circulaire, focus force oblique'}] },
+      { name:'Jambes & Relance verticale', series:'',
+        ex:[{n:'Back fentes serrées (arrière, appuis étroits)',d:'10 – 10 – 8 – 8 – 6 reps — stabilité unilatérale'},{n:'Saut sur box (départ genoux)',d:'5 × 6 reps — coordination + explosivité concentrique'}] },
+      { name:'Chaîne postérieure & Snatch unilatéral', series:'',
+        ex:[{n:'Good Morning barre légère',d:'12 – 12 – 10 – 10 – 8 reps — descente complète, extension puissante'},{n:'Arraché Kettlebell (alterné)',d:'5 × 6 reps — puissance hanches, unilatéral'}] },
+      { name:'Plyométrie Med Ball (au choix 3-4 ex.)', series:'2-3 tours, 30-40 sec / mouvement',
+        ex:[{n:'Slam au sol (frontal)',d:''},{n:'Lancer oblique (mur ou sol)',d:''},{n:'Lancer arrière au-dessus de la tête',d:''},{n:'Russian Twist explosif (rebond sol)',d:''},{n:'Squat + lancer frontal',d:''},{n:'Jump squat + slam',d:''}] }
+    ],
+    cooldown:'Mobilité ciblée : hanches, ischios, thorax',
+    notes:'Privilégier la vitesse dans les mouvements explosifs, pas la charge maximale.'
+  },
+
+  lactiqueCardio: {
+    id:'lactiqueCardio', title:'Lactique Cardio – Circuit Cubain', subtitle:'Tapis pente · 3 matchs circuit',
+    type:'lactique', icon:'🔴', intensity:4, duration:'75 min',
+    warmup:['5 min vélo + mobilisation des articulations'],
+    blocs:[
+      { name:'Tapis de course en garde', series:'15-20 min',
+        ex:[{n:'Marche en garde sur pente 17-19°',d:'15-20 min en fléchissant les genoux — pause toutes les 2 min si nécessaire'}] },
+      { name:'Circuit Cubain – Match A (×2)', series:'Pause 30 sec entre les 2 passages',
+        ex:[{n:'Rotation par-dessus la tête',d:'30 sec'},{n:'Développé par-dessus la tête',d:'30 sec'},{n:'15 tours dans un sens, 15 dans l\'autre',d:'30 sec'},{n:'Tracteur',d:'30 sec'},{n:'Push devant',d:'30 sec'},{n:'Latéral',d:'30 sec'}] },
+      { name:'Circuit Cubain – Match B (×2)', series:'Pause 2 min entre matchs',
+        ex:[{n:'Épaule (15 un bras, 15 l\'autre)',d:'30 sec'},{n:'Tirage',d:'30 sec'},{n:'Volant',d:'30 sec'},{n:'Derrière la tête',d:'30 sec'},{n:'Garde coude fermé',d:'30 sec'},{n:'Épaule jeté',d:'30 sec'}] },
+      { name:'Finisher', series:'',
+        ex:[{n:'Lombaires',d:'4 × 40 reps sans poids'}] }
+    ],
+    cooldown:'Étirements',
+    notes:'Structure : Tapis 15-20 min → 5 min pause → Match A → 2 min → Match B → 2 min → Match A bis'
+  },
+
+  force4: {
+    id:'force4', title:'Force – Hypertrophie', subtitle:'SDT Sumo · Garde Greco · Dév mil',
+    type:'force', icon:'🏆', intensity:5, duration:'85 min',
+    warmup:['5 min : vélo, rameur, assault bike, skierg ou tapis','4 × 10 reps Élévation frontale haltère 7 kg'],
+    blocs:[
+      { name:'Bloc 1', series:'5 tours',
+        ex:[{n:'Soulevé de terre sumo',d:'5 reps @ 80 % du max — cible [130-160 kg]'},{n:'Kettlebell arraché entre step',d:'10 reps'}] },
+      { name:'Bloc 2', series:'5 tours',
+        ex:[{n:'Fentes avant (Front fente)',d:'5 reps — cible [110-130 kg]'},{n:'Garde Greco position très fléchie, dos droit',d:'1 min (30 sec jambe D / 30 sec jambe G)'}] },
+      { name:'Bloc 3', series:'5 tours',
+        ex:[{n:'Développé couché au sol avec haltères, hanches levées',d:'5 reps — haltère 40 kg'},{n:'Lancers de medicine ball au sol',d:'6 reps'}] },
+      { name:'Bloc 4 – Épaules @ 90 %', series:'5 tours',
+        ex:[{n:'Développé militaire',d:'5 reps — cible [55-65 kg]'},{n:'Landmine rotation bas',d:'20 reps (10 / côté)'}] },
+      { name:'Bloc 5 – Coordination & Repérage spatial', series:'',
+        ex:[{n:'Travail de nuque (surpasser) avec 10 kg',d:'4 × 20 reps'},{n:'Good morning bas',d:'3 × 10 reps'},{n:'Lombaires (au sol ou sur banc)',d:'4 × 30 reps'}] }
+    ],
+    cooldown:null,
+    notes:'Poids attendus : SDT Sumo [130-160] · Fente avant [110-130] · Dév couché 40 kg haltère · Dév militaire [55-65]'
+  },
+
+  explosivite3: {
+    id:'explosivite3', title:'Explosivité – Dos & Coordination', subtitle:'Rowing alterné · T-Bar · Plyométrie pecs',
+    type:'explosivite', icon:'🎯', intensity:4, duration:'75 min',
+    warmup:['Mobilisation articulaire générale','Activation dynamique légère'],
+    blocs:[
+      { name:'Rowing Alterné & Explosif', series:'5 séries',
+        ex:[{n:'Rowing barre, prise alternée',d:'6 reps — ne pas lâcher la barre entre les mains'},{n:'Rowing explosif, départ barre au sol',d:'4 reps — exécution rapide'}] },
+      { name:'T-Bar & Kettlebell', series:'5 séries',
+        ex:[{n:'T-Bar (entre les jambes)',d:'6 reps — mouvement balistique'},{n:'Kettlebell snatch style gréco-romaine',d:'6 reps — puissance unilatérale, transfert vertical'}] },
+      { name:'Puissance Full Body', series:'5 séries / superset',
+        ex:[{n:'Good Morning @ 50 % du 1RM + "Bras à la volée" (poulie/élastique)',d:'15 reps + 6 reps'},{n:'Zercher Squat @ 50 % + Squats sautés départ genoux',d:'10 reps + 6 reps'},{n:'Développé militaire @ 50 % + Squats sautés unilatéraux',d:'10 reps + 6 reps (3G/3D)'},{n:'Épaulé @ 70 % (barre gardée en main haute)',d:'8 reps continues, sans reposer'}] },
+      { name:'Coordination & Repérage spatial', series:'',
+        ex:[{n:'Travail de nuque surpassé',d:'4 × 20 reps (variante 10 reps si difficulté élevée)'},{n:'Rotation complète',d:'3 séries × 5 reps / côté'},{n:'Lombaires (au sol ou banc)',d:'4 × 30 reps — sans hyperlordose'}] },
+      { name:'Plyométrie Pectoraux & Triceps', series:'2 tours intensifs',
+        ex:[{n:'Step-pompes dynamiques',d:'1 min — 2 mains step > 1 main sol > centre > switch'},{n:'Pompes varan',d:'30 sec — pompes saccadées rapides'},{n:'Pompes coréennes',d:'15 m aller-retour — déplacement en appui bras/jambes tendues'}] }
+    ],
+    cooldown:'Bien s\'hydrater — retour au calme ciblé',
+    notes:'Repos entre les blocs : 60 à 90 sec. Maîtriser la phase excentrique même en explosivité.'
+  },
+
+  lactiqueP: {
+    id:'lactiqueP', title:'Lactique Piste – 3×3×400 m', subtitle:'Blocs 400 m · Isométrie Greco',
+    type:'lactique', icon:'🏃', intensity:5, duration:'60 min',
+    warmup:['2 tours de piste en trottinement','Étirements dynamiques ciblant les ischio-jambiers'],
+    blocs:[
+      { name:'Bloc Lactique – Travail sur Piste', series:'3 blocs × 3 × 400 m',
+        ex:[{n:'400 m × 3',d:'Objectif : chaque 400 m en < 1\'25 — récup 1 min entre les 400 m'},{n:'Bloc 1 → Bloc 2 → Bloc 3',d:'4 min de récupération entre chaque bloc'}] },
+      { name:'Renforcement Isométrique Greco', series:'2 séries',
+        ex:[{n:'Garde Greco, position fléchie la plus basse possible',d:'2 × 3 min — concentration sur le maintien, les appuis et l\'engagement postural'}] }
+    ],
+    cooldown:'Étirements ciblés : quadriceps, ischio-jambiers, mollets',
+    notes:null
+  },
+
+  endurance3: {
+    id:'endurance3', title:'Endurance de Force – Circuit', subtitle:'Circuit 6 tours barre · Haltères · Tractions & Dips',
+    type:'endurance', icon:'🔄', intensity:4, duration:'70 min',
+    warmup:['Échauffement bulgare avec charges de 2 à 4 kg','Barre de 20 kg pour activation musculaire'],
+    blocs:[
+      { name:'Circuit Barre (sans pause entre ex.)', series:'6 tours',
+        ex:[{n:'Soulevé de terre',d:'10 reps'},{n:'Rowing barre',d:'10 reps'},{n:'Développé militaire',d:'10 reps'},{n:'Back squat',d:'10 reps'},{n:'Good morning',d:'10 reps — charge progressive tour par tour'}] },
+      { name:'Travail avec haltères', series:'4 × 12 reps',
+        ex:[{n:'Descendre en touchant le sol avec les haltères → remonter bras au-dessus de la tête',d:'Contrôle total du mouvement — pas de compensation'}] },
+      { name:'Tractions & Dips', series:'3 tours',
+        ex:[{n:'Tractions',d:'15 reps'},{n:'Dips',d:'20 reps'}] }
+    ],
+    cooldown:'Récupération de 2 min après le circuit barre avant de passer aux haltères',
+    notes:'Premier tour avec charge légère pour activation. Augmenter progressivement les tours suivants.'
+  },
+
+  forceGrip: {
+    id:'forceGrip', title:'Force & Volume – Grip', subtitle:'Haut du corps · Poignets · Farmer Walk',
+    type:'force', icon:'✊', intensity:3, duration:'60 min',
+    warmup:['Mobilisation générale épaules et poignets'],
+    blocs:[
+      { name:'Activation / Spécifique', series:'',
+        ex:[{n:'Papillon allongé sur la poulie',d:'5 × 20 reps'},{n:'Exercice Khamzat à la poulie',d:'3 × 3 min'}] },
+      { name:'Poussée verticale', series:'',
+        ex:[{n:'Développé militaire assis',d:'20 / 15 / 12 / 12 / 10 reps'}] },
+      { name:'Bas du corps', series:'',
+        ex:[{n:'Double squat bas',d:'5 × 5 reps'},{n:'SDT aussi contre mur',d:'5 × 3 reps'}] },
+      { name:'Poignets & Grip', series:'',
+        ex:[{n:'Haltère band sur barre – travail de poignet',d:'1 min 30'},{n:'Farmer walk',d:'3 allers-retours (équivalent 2 tapis de lutte)'}] }
+    ],
+    cooldown:null,
+    notes:null
+  },
+
+  plyo8: {
+    id:'plyo8', title:'Plyométrie Jambes', subtitle:'Déplacements 25 m · Bonds · Squat unilatéral',
+    type:'plyo', icon:'🦵', intensity:3, duration:'45 min',
+    warmup:['Échauffement articulaire — priorité aux genoux'],
+    blocs:[
+      { name:'Travail de Déplacement (25 m = 2 tapis)', series:'Aller-retour',
+        ex:[{n:'Bonds classiques',d:'3 × aller-retour'},{n:'Bonds arrière',d:'2 × aller-retour'},{n:'Bonds départ genoux',d:'2 × aller-retour'},{n:'Mini sauts',d:'2 × aller-retour'},{n:'Korean',d:'1 × aller-retour'},{n:'Fentes arrière',d:'1 × aller-retour'}] },
+      { name:'Renforcement Unilatéral', series:'3 séries',
+        ex:[{n:'Squat sur une jambe',d:'5 reps par jambe — aide d\'un support si nécessaire pour l\'équilibre'}] }
+    ],
+    cooldown:'Étirements quadriceps et genoux',
+    notes:null
+  }
+};
+
+const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+const WEEKS = {
+  1: ['force2','explosivite1','lactique2','endurance5','fullbody7','lactiqueCardio','rest'],
+  2: ['force4','explosivite3','lactiqueP','endurance3','forceGrip','plyo8','rest']
+};
+
+let currentWeek = 1;
+let currentSession = null;
+
+function dots(n, intensity, type) {
+  let html = '<div class="s-dots">';
+  for (let i = 1; i <= 5; i++) html += `<div class="s-dot${i <= intensity ? ' on' : ''}"></div>`;
+  return html + '</div>';
+}
+
+function renderCard(sessId, dayName) {
+  if (sessId === 'rest') return `
+    <div class="rest-card">
+      <div class="rest-icon">😴</div>
+      <div class="rest-lbl">Repos</div>
+    </div>`;
+  const s = SESSIONS[sessId];
+  const t = TYPE[s.type];
+  return `
+    <div class="s-card ${s.type}" onclick="openPanel('${s.id}')">
+      <span class="s-icon">${s.icon}</span>
+      <div class="s-badge">${t.label}</div>
+      <div class="s-title">${s.title}</div>
+      <div class="s-sub">${s.subtitle}</div>
+      <div class="s-footer">
+        ${dots(5, s.intensity, s.type)}
+        <span class="s-dur">${s.duration}</span>
+      </div>
+    </div>`;
+}
+
+function renderCalendar() {
+  const plan = WEEKS[currentWeek];
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = DAYS.map((day, i) => `
+    <div class="day-col">
+      <div class="day-head">
+        <div class="day-name">${day}</div>
+      </div>
+      ${renderCard(plan[i], day)}
+    </div>`).join('');
+}
+
+function showWeek(n) {
+  currentWeek = n;
+  document.getElementById('btn1').classList.toggle('active', n === 1);
+  document.getElementById('btn2').classList.toggle('active', n === 2);
+  renderCalendar();
+}
+
+function openPanel(id) {
+  const s = SESSIONS[id];
+  const t = TYPE[s.type];
+  currentSession = id;
+
+  // Build dots for header
+  let dotsHtml = '<div style="display:flex;gap:4px;margin-top:8px">';
+  for (let i = 1; i <= 5; i++) dotsHtml += `<div style="width:7px;height:7px;border-radius:50%;background:${i<=s.intensity?t.color:'rgba(255,255,255,.1)'}"></div>`;
+  dotsHtml += '</div>';
+
+  document.getElementById('pHead').innerHTML = `
+    <button class="p-close" onclick="closePanel()">✕</button>
+    <div class="p-badge" style="background:${t.bg};color:${t.color}">${t.label}</div>
+    <div class="p-title">${s.title}</div>
+    <div class="p-sub">${s.subtitle}</div>
+    <div class="p-chips">
+      <div class="p-chip">⏱ ${s.duration}</div>
+      <div class="p-chip">🎯 Intensité${dotsHtml}</div>
+      <div class="p-chip">📋 ${s.blocs.length} blocs</div>
+    </div>`;
+
+  let body = '';
+
+  // Warmup
+  if (s.warmup && s.warmup.length) {
+    body += `<div class="sec-lbl">Échauffement</div>
+    <div class="warmup-box"><ul style="list-style:none">
+      ${s.warmup.map(w=>`<li>${w}</li>`).join('')}
+    </ul></div>`;
+  }
+
+  // Blocs
+  body += `<div class="sec-lbl">Programme</div>`;
+  const blocColor = t.color;
+  s.blocs.forEach((b, i) => {
+    body += `<div class="bloc">
+      <div class="bloc-hd">
+        <div class="bloc-n" style="background:${blocColor}">${i+1}</div>
+        <div class="bloc-nm">${b.name}</div>
+        ${b.series ? `<div class="bloc-s">${b.series}</div>` : ''}
+      </div>
+      <div class="ex-list">
+        ${b.ex.map(e=>`<div class="ex-item">
+          <div class="ex-name">${e.n}</div>
+          ${e.d ? `<div class="ex-det">${e.d}</div>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+
+  // Notes
+  if (s.notes) {
+    body += `<div class="note-box">
+      <div class="note-title">Notes & Conseils</div>
+      <div class="note-text">${s.notes}</div>
+    </div>`;
+  }
+
+  // Cooldown
+  if (s.cooldown) {
+    body += `<div class="sec-lbl" style="margin-top:20px">Retour au calme</div>
+    <div class="cooldown-box"><p>${s.cooldown}</p></div>`;
+  }
+
+  document.getElementById('pBody').innerHTML = body;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePanel() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('panel').classList.remove('open');
+  document.body.style.overflow = '';
+  currentSession = null;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+renderCalendar();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('planning-sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
