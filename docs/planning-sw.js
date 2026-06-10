@@ -1,4 +1,4 @@
-const CACHE = 'mathias-prog-v1';
+const CACHE = 'lutte-prog-v1';
 const ASSETS = ['planning.html', 'planning-manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

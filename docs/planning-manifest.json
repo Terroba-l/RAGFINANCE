@@ -1,6 +1,6 @@
 {
-  "name": "Mathias — Programme Lutte",
-  "short_name": "Prog Mathias",
+  "name": "Lutte — Programme",
+  "short_name": "Prog Lutte",
   "description": "Planning d'entraînement lutte gréco-romaine",
   "start_url": "/planning.html",
   "display": "standalone",
