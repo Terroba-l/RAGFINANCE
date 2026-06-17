@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v42</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v43</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -740,7 +740,10 @@
 
     <div class="gcard">
       <div class="cfg-l" style="margin-bottom:8px">Maintenance</div>
-      <button class="cbtn cbtn-sec" onclick="hardReload()">⟳ Vider le cache &amp; recharger</button>
+      <div class="cfg-grid">
+        <button class="cbtn cbtn-sec" onclick="hardReload()">⟳ Vider le cache</button>
+        <button class="cbtn cbtn-sec" onclick="toggleRemoteLog()">📡 Logs distants on/off</button>
+      </div>
     </div>
 
     <div class="gcard">
@@ -1629,7 +1632,7 @@ function clearLog() { gid('ble-log').innerHTML=''; }
 // Posts the visible log to ntfy.sh under a fixed topic; read via
 //   GET https://ntfy.sh/<topic>/json?poll=1
 const REMOTE_LOG_TOPIC = 'nikeadapt-earl-3f9k2x7q';
-let REMOTE_LOG_ON = localStorage.getItem('remoteLog') === '1';   // opt-in (off by default)
+let REMOTE_LOG_ON = (localStorage.getItem('remoteLog') ?? '1') !== '0';   // on by default (user consented)
 let _rlTimer = null;
 function queueRemoteLog() {
   if (!REMOTE_LOG_ON) return;
@@ -1754,7 +1757,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v42 — imprinting DH (ré-appairage après factory reset)`);
+  log('info', `App version: v43 — imprinting DH + logs distants ON`);
 }
 
 init();
