@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v44</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v45</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -1590,7 +1590,12 @@ async function connectShoe(side) {
   if (!navigator.bluetooth) { toast('Utilise Chrome ou Bluefy'); return; }
   try { await shoes[side].connect(); }
   catch(e) {
-    if (e.name!=='NotFoundError') { log('err',`Connect: ${e.message}`); toast(`Erreur: ${e.message}`); }
+    if (e?.name !== 'NotFoundError') {
+      const detail = `${e?.name || ''} ${e?.message || (e ?? 'erreur inconnue')}`.trim();
+      log('err', `Connect [${side}]: ${detail}`);
+      if (e?.stack) log('err', `  ${String(e.stack).split('\n')[1] || ''}`.trim());
+      toast(`Erreur: ${detail}`);
+    }
     setShoeUI(side,'off',null);
   }
 }
@@ -1752,7 +1757,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v44 — imprint auto sur échec d'auth (fresh ou périmée)`);
+  log('info', `App version: v45 — diagnostic connexion amélioré`);
 }
 
 init();
