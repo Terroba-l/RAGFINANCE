@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v41</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v42</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -993,6 +993,47 @@ function corerfParse(buf) {
 }
 function bytesEq(a, b) { if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 
+// ── Diffie-Hellman imprinting primitives (com.nike.corerf.bigfoot.a) ──
+// 4 MODP groups (RFC 2409 / 3526). The shoe's key-gen response selects one.
+const DH_GROUPS = {
+  0: { len: 96,  p: 'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A63A3620FFFFFFFFFFFFFFFF' },
+  1: { len: 128, p: 'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF' },
+  2: { len: 192, p: 'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF' },
+  3: { len: 256, p: 'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF' },
+};
+function modPow(b, e, m) { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = r * b % m; e >>= 1n; b = b * b % m; } return r; }
+function bnToBytes(n) { let h = n.toString(16); if (h.length % 2) h = '0' + h; const a = new Uint8Array(h.length / 2); for (let i = 0; i < a.length; i++) a[i] = parseInt(h.substr(i * 2, 2), 16); return a; }
+function bnToBytesFixed(n, len) { const m = bnToBytes(n); if (m.length >= len) return m.slice(m.length - len); const o = new Uint8Array(len); o.set(m, len - m.length); return o; }
+function bytesToBn(b) { let h = ''; for (const x of b) h += x.toString(16).padStart(2, '0'); return BigInt('0x' + (h || '0')); }
+
+// Pure-JS MD5 (WebCrypto has no MD5; used to derive authKey = MD5(DH shared secret))
+function md5bytes(data) {
+  const u32 = x => x >>> 0, rot = (v, n) => u32((v << n) | (v >>> (32 - n)));
+  const K = [0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391];
+  const S = [7,12,17,22,5,9,14,20,4,11,16,23,6,10,15,21];
+  const len = data.length, padLen = (Math.floor((len + 8) / 64) + 1) * 64;
+  const padded = new Uint8Array(padLen); padded.set(data); padded[len] = 0x80;
+  const dv = new DataView(padded.buffer);
+  dv.setUint32(padLen - 8, (len * 8) >>> 0, true); dv.setUint32(padLen - 4, Math.floor(len / 0x20000000), true);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let i = 0; i < padLen; i += 64) {
+    const M = Array.from({ length: 16 }, (_, j) => dv.getUint32(i + j * 4, true));
+    let a = a0, b = b0, c = c0, d = d0;
+    for (let j = 0; j < 64; j++) {
+      let F, g;
+      if (j < 16) { F = (b & c) | (~b & d); g = j; }
+      else if (j < 32) { F = (d & b) | (~d & c); g = (5 * j + 1) % 16; }
+      else if (j < 48) { F = b ^ c ^ d; g = (3 * j + 5) % 16; }
+      else { F = c ^ (b | ~d); g = (7 * j) % 16; }
+      F = u32(F + a + K[j] + M[g]); a = d; d = c; c = b; b = u32(b + rot(F, S[((j >> 4) << 2) + (j & 3)]));
+    }
+    a0 = u32(a0 + a); b0 = u32(b0 + b); c0 = u32(c0 + c); d0 = u32(d0 + d);
+  }
+  const out = new DataView(new ArrayBuffer(16));
+  [a0, b0, c0, d0].forEach((v, i) => out.setUint32(i * 4, v, true));
+  return new Uint8Array(out.buffer);
+}
+
 class NikeShoe {
   constructor(side) {
     this.side = side;
@@ -1033,7 +1074,11 @@ class NikeShoe {
     this.server = await this.device.gatt.connect();
     await this._discover();
     this._seq = 0; this._rx = []; this._pending = null;   // fresh Ripley state per connection
-    await this._auth();
+    const authed = await this._auth();
+    if (!authed && this._canImprint) {
+      log('info', `[${this.device?.name || this.label}] → Imprint automatique (chaussure en mode appairage)…`);
+      await this.imprint();
+    }
     await this._readDeviceInfo();
     await this._readBatt();
     this.connected = true;
@@ -1120,15 +1165,16 @@ class NikeShoe {
     log('rx', `[${dev}] deviceNonce=${b2h(deviceNonce)}`);
 
     // 3b — identify which key the shoe is really using, by matching its
-    //      encryptedPhoneNonce = AES(realKey, phoneNonce) against our candidates.
-    let authKey = null, authKeyName = '';
+    //      encryptedPhoneNonce = AES(realKey, phoneNonce) against our candidates
+    //      (freshly-imprinted candidates first, then saved + factory-extracted keys).
+    let matched = null;
     if (encPhoneNonce && encPhoneNonce.length === 16) {
-      for (const c of this._candidateKeys()) {
-        if (bytesEq(await aesEcb(c.bytes, phoneNonce), encPhoneNonce)) { authKey = c.bytes; authKeyName = c.name; break; }
+      for (const c of [...(this._imprintCandidates || []), ...this._candidateKeys()]) {
+        if (bytesEq(await aesEcb(c.bytes, phoneNonce), encPhoneNonce)) { matched = c; break; }
       }
     }
 
-    if (!authKey) {
+    if (!matched) {
       log('err', `[${dev}] ⚠️ Aucune clé connue ne correspond — clé périmée (la chaussure a été ré-imprintée).`);
       // ask the shoe whether it will (re)imprint a fresh key
       const kg = await this._sendMessage(OP.START_AUTH_KEY_GENERATION, MT.REQUEST, new Uint8Array(0), { timeout: 5000 });
@@ -1142,7 +1188,8 @@ class NikeShoe {
       return false;
     }
 
-    log('rx', `[${dev}] 🔑 Clé reconnue: ${authKeyName}`);
+    const authKey = matched.bytes;
+    log('rx', `[${dev}] 🔑 Clé reconnue: ${matched.name}`);
 
     // 4 — answer the challenge: AES-128-ECB(authKey, deviceNonce)
     const encDeviceNonce = await aesEcb(authKey, deviceNonce);
@@ -1151,13 +1198,66 @@ class NikeShoe {
       OP.AUTHENTICATION_CHALLENGE, MT.REQUEST, new Uint8Array(pbBytes(1, encDeviceNonce)), { timeout: 6000 });
 
     if (res != null) {
-      this._authOK = true; this._authKey = authKey;
-      log('rx', `[${dev}] ✅ AUTH OK (${authKeyName})`);
+      this._authOK = true; this._authKey = authKey; this._imprintCandidates = null;
+      // persist a freshly imprinted key under the device name, for future connections
+      if (this.device?.name && /imprint/i.test(matched.name)) {
+        try {
+          const s = JSON.parse(localStorage.getItem('imprintedKeys') || '{}');
+          s[this.device.name] = b2h(authKey).replace(/ /g, '').toLowerCase();
+          localStorage.setItem('imprintedKeys', JSON.stringify(s));
+          log('info', `[${dev}] 💾 Clé imprintée sauvegardée`);
+        } catch {}
+      }
+      log('rx', `[${dev}] ✅ AUTH OK (${matched.name})`);
       toast(`✅ ${this.label} authentifiée`);
       return true;
     }
     log('err', `[${dev}] ✗ Challenge refusé (NAK)`);
     return false;
+  }
+
+  // (Re)imprint: establish a NEW shared key via Diffie-Hellman, then authenticate.
+  // Only works when the shoe is in a fresh/unimprinted state (after a factory reset);
+  // an already-imprinted shoe NAKs START_AUTH_KEY_GENERATION.  Ref: xa.g.r() + l3.f + xa.l
+  async imprint() {
+    if (!this.wChar) return false;
+    const dev = this.device?.name || this.label;
+    log('tx', `[${dev}] IMPRINT → START_AUTH_KEY_GENERATION`);
+    // 1 — key generation (response carries the DH group; the answer may arrive on op 0x6F)
+    const kg = await this._sendMessage(OP.START_AUTH_KEY_GENERATION, MT.REQUEST, new Uint8Array(0),
+      { timeout: 20000, altOpcode: OP.EXCHANGE_PUBLIC_KEY });
+    if (kg == null) { log('err', `[${dev}] Imprint: la chaussure refuse la génération de clé (pas en mode imprint / pas reset).`); return false; }
+    const grp = (pbDecode(kg)[1] || {}).val || 0;
+    const group = DH_GROUPS[grp];
+    if (!group) { log('err', `[${dev}] Imprint: groupe DH inconnu (${grp})`); return false; }
+    log('rx', `[${dev}] Groupe DH = ${grp} (${group.len * 8} bits)`);
+
+    // 2 — our ephemeral DH keypair
+    const p = BigInt('0x' + group.p);
+    const priv = bytesToBn(crypto.getRandomValues(new Uint8Array(group.len)));
+    const ourPub = bnToBytes(modPow(2n, priv, p));
+    log('tx', `[${dev}] EXCHANGE_PUBLIC_KEY (${ourPub.length} B)`);
+
+    // 3 — exchange public keys: ExchangePublicKey { publicKey = field 1 }
+    const ex = await this._sendMessage(OP.EXCHANGE_PUBLIC_KEY, MT.REQUEST,
+      new Uint8Array(pbBytes(1, ourPub)), { timeout: 33000 });
+    if (ex == null) { log('err', `[${dev}] Imprint: pas de réponse à l'échange de clés`); return false; }
+    const devPub = (pbDecode(ex)[1] || {}).bytes;
+    if (!devPub || devPub.length < 32) { log('err', `[${dev}] Imprint: clé publique chaussure invalide`); return false; }
+    log('rx', `[${dev}] Clé publique chaussure reçue (${devPub.length} B)`);
+
+    // 4 — shared secret → authKey = MD5(shared). The byte representation of the shared
+    //     secret is ambiguous (leading zeros), so derive both conventions and let the
+    //     auth's encryptedPhoneNonce check pick the one the shoe actually used.
+    const shared = modPow(bytesToBn(devPub), priv, p);
+    this._imprintCandidates = [
+      { name: 'imprintée (min)', bytes: md5bytes(bnToBytes(shared)) },
+      { name: 'imprintée (fix)', bytes: md5bytes(bnToBytesFixed(shared, group.len)) },
+    ];
+    log('info', `[${dev}] Clé dérivée — authentification avec la nouvelle clé…`);
+
+    // 5 — authenticate; _auth tries the imprint candidates and persists the winner
+    return await this._auth();
   }
 
   async _readDeviceInfo() {
@@ -1270,7 +1370,8 @@ class NikeShoe {
       const timeout = opts.timeout || 3000;
       this._rx = [];                       // start clean so a stray segment can't corrupt us
       const frame = corerfFrame(opcode, msgType, payload);
-      const wait = new Promise(resolve => { this._pending = { opcode, resolve }; });
+      const opcodes = opts.altOpcode != null ? [opcode, opts.altOpcode] : [opcode];
+      const wait = new Promise(resolve => { this._pending = { opcodes, resolve }; });
       try { await this._writeFramed(frame); }
       catch (e) { this._pending = null; log('err', `[${this.label}] write op=0x${opcode.toString(16)}: ${e?.message ?? e}`); return null; }
       const res = await Promise.race([wait, sleep(timeout).then(() => '__t__')]);
@@ -1331,7 +1432,7 @@ class NikeShoe {
     log('rx', `[${this.label}] ← op=0x${msg.opcode.toString(16).padStart(2, '0')} ${tName} ${b2h(msg.payload)}`);
 
     // resolve a pending request whose opcode matches
-    if (this._pending && this._pending.opcode === msg.opcode && (msg.msgType === MT.ACK || msg.msgType === MT.NAK)) {
+    if (this._pending && this._pending.opcodes.includes(msg.opcode) && (msg.msgType === MT.ACK || msg.msgType === MT.NAK)) {
       const r = this._pending.resolve; this._pending = null; r(msg); return;
     }
     // otherwise it's an unsolicited EVENT
@@ -1520,8 +1621,30 @@ function log(type, msg) {
   d.className='ll '+type; d.textContent=`[${t}] ${msg}`;
   el.appendChild(d); el.scrollTop=el.scrollHeight;
   while(el.children.length>120) el.removeChild(el.firstChild);
+  queueRemoteLog();
 }
 function clearLog() { gid('ble-log').innerHTML=''; }
+
+// ── Remote log mirror (so the dev can read BLE logs without copy/paste) ──
+// Posts the visible log to ntfy.sh under a fixed topic; read via
+//   GET https://ntfy.sh/<topic>/json?poll=1
+const REMOTE_LOG_TOPIC = 'nikeadapt-earl-3f9k2x7q';
+let REMOTE_LOG_ON = localStorage.getItem('remoteLog') === '1';   // opt-in (off by default)
+let _rlTimer = null;
+function queueRemoteLog() {
+  if (!REMOTE_LOG_ON) return;
+  clearTimeout(_rlTimer);
+  _rlTimer = setTimeout(() => {
+    const text = Array.from(gid('ble-log').children).map(d => d.textContent).join('\n');
+    try { fetch('https://ntfy.sh/' + REMOTE_LOG_TOPIC, { method: 'POST', body: text.slice(-3500), headers: { 'Title': 'EARL log ' + new Date().toLocaleTimeString('fr-FR') } }).catch(()=>{}); } catch {}
+  }, 1200);
+}
+function toggleRemoteLog() {
+  REMOTE_LOG_ON = !REMOTE_LOG_ON;
+  localStorage.setItem('remoteLog', REMOTE_LOG_ON ? '1' : '0');
+  toast('Logs distants ' + (REMOTE_LOG_ON ? 'ON ✓' : 'OFF'));
+  if (REMOTE_LOG_ON) queueRemoteLog();
+}
 
 function copyLog() {
   const text = Array.from(gid('ble-log').querySelectorAll('div'))
@@ -1631,7 +1754,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v41 — auth multi-clés + détection ré-imprint`);
+  log('info', `App version: v42 — imprinting DH (ré-appairage après factory reset)`);
 }
 
 init();
