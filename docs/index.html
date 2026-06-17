@@ -1218,17 +1218,25 @@ class NikeShoe {
   // empty) on success, or null on NAK / timeout.
   async _sendMessage(opcode, msgType, payload, opts = {}) {
     if (!this.wChar) return null;
-    const timeout = opts.timeout || 3000;
-    this._rx = [];                       // start clean so a stray segment can't corrupt us
-    const frame = corerfFrame(opcode, msgType, payload);
-    const wait = new Promise(resolve => { this._pending = { opcode, resolve }; });
-    try { await this._writeFramed(frame); }
-    catch (e) { this._pending = null; log('err', `[${this.label}] write op=0x${opcode.toString(16)}: ${e?.message ?? e}`); return null; }
-    const res = await Promise.race([wait, sleep(timeout).then(() => '__t__')]);
-    this._pending = null;
-    if (res === '__t__') { log('err', `[${this.label}] timeout op=0x${opcode.toString(16)}`); return null; }
-    if (res.msgType === MT.NAK) { log('err', `[${this.label}] NAK op=0x${opcode.toString(16)}`); return null; }
-    return res.payload;                  // ACK
+    // Serialize: a new request waits for the previous one to finish, so their
+    // Ripley sequence numbers, reassembly buffer and pending-slot never interleave.
+    const prev = this._lock || Promise.resolve();
+    let release; this._lock = new Promise(r => { release = r; });
+    try {
+      await prev;
+      if (!this.wChar) return null;
+      const timeout = opts.timeout || 3000;
+      this._rx = [];                       // start clean so a stray segment can't corrupt us
+      const frame = corerfFrame(opcode, msgType, payload);
+      const wait = new Promise(resolve => { this._pending = { opcode, resolve }; });
+      try { await this._writeFramed(frame); }
+      catch (e) { this._pending = null; log('err', `[${this.label}] write op=0x${opcode.toString(16)}: ${e?.message ?? e}`); return null; }
+      const res = await Promise.race([wait, sleep(timeout).then(() => '__t__')]);
+      this._pending = null;
+      if (res === '__t__') { log('err', `[${this.label}] timeout op=0x${opcode.toString(16)}`); return null; }
+      if (res.msgType === MT.NAK) { log('err', `[${this.label}] NAK op=0x${opcode.toString(16)}`); return null; }
+      return res.payload;                  // ACK
+    } finally { release(); }
   }
 
   // Ripley transport (xa.h0.b): split the framed message into ≤19-byte chunks,
@@ -1265,12 +1273,6 @@ class NikeShoe {
     const pkt = new Uint8Array(e.target.value.buffer);
     if (pkt.length === 0) return;
     const hdr = pkt[0];
-
-    // legacy probe/DH paths still listen on _challengeResolve (raw packet)
-    if (this._challengeResolve) {
-      this._challengeResolve({ opcode: pkt[0], second: pkt[1], data: pkt });
-      this._challengeResolve = null;
-    }
 
     // Ripley flow-control / keepalive packet (bit 0x40 set) — e.g. the shoe's "C0 xx"
     if (hdr & 0x40) { log('rx', `[${this.label}] ⟲ ${b2h(pkt)}`); return; }
@@ -1363,8 +1365,13 @@ function updateFit(side, val) {
   gid('sl-'+side).value = val;
   gid('fpct-'+side[0]).textContent = val + '%';
   const h = gid('hero-'+side[0]); if (h) h.textContent = val;
-  if (shoes[side].connected) shoes[side].setTightness(val);
+  // debounce: only send the final value once the user stops dragging the slider
+  if (shoes[side].connected) {
+    clearTimeout(_fitTimer[side]);
+    _fitTimer[side] = setTimeout(() => shoes[side].setTightness(val), 180);
+  }
 }
+const _fitTimer = {};
 
 function updateHeroStatus() {
   const on = shoes.left.device?.gatt?.connected || shoes.right.device?.gatt?.connected;
