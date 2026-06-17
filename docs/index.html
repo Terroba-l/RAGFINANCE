@@ -64,16 +64,43 @@
     /* ── L / R hero ── */
     .lr-view {
       flex: 1; position: relative; z-index: 5; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
     }
-    .lr-l, .lr-r {
-      position: absolute;
-      font-family: 'Barlow Condensed', 'Impact', Arial, sans-serif;
-      font-weight: 900; color: white;
-      font-size: 108vw; line-height: 0.88;
-      letter-spacing: -4px; pointer-events: none;
+    .hero {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 22px; width: 100%; padding: 0 24px;
     }
-    .lr-l { top: -6%; left: -4%; }
-    .lr-r { bottom: -6%; right: -4%; }
+    .hero-status {
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 3px; color: rgba(255,255,255,0.55);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hero-status::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #555; box-shadow: none; transition: all 0.3s;
+    }
+    .hero-status.on { color: #fff; }
+    .hero-status.on::before { background: #04da13; box-shadow: 0 0 8px #04da13; }
+    .shoe-hero {
+      width: min(74vw, 360px); height: auto;
+      transition: filter 0.6s ease;
+    }
+    .hero-fit { display: flex; gap: 14px; }
+    .fit-chip {
+      display: flex; align-items: baseline; gap: 9px;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 16px; padding: 12px 22px; cursor: pointer;
+      backdrop-filter: blur(8px); transition: background 0.15s;
+    }
+    .fit-chip:active { background: rgba(255,255,255,0.14); }
+    .fc-side {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 2px;
+      color: rgba(255,255,255,0.5);
+    }
+    .fc-val {
+      font-family: 'Barlow Condensed', Impact, sans-serif; font-weight: 900;
+      font-size: 1.9rem; color: #fff; line-height: 1;
+    }
 
     /* ── Bottom nav ── */
     nav.bnav {
@@ -368,24 +395,18 @@
   <!-- ── Header ── -->
   <header>
     <button class="hdr-btn" onclick="openSheet('shoes')">
-      <svg width="28" height="18" viewBox="0 0 28 18" fill="white">
-        <path d="M1 14 Q7 8 14 7 Q20 6 26 9 L27 13 Q20 10 13 11 Q7 12 2 16 Z"/>
-        <path d="M2 16 Q8 13 13 11 Q20 10 27 13 L27 16 Q20 14 13 14 Q7 14 2 16 Z" opacity=".5"/>
+      <svg width="30" height="30" viewBox="0 0 60 60" fill="white">
+        <path fill-rule="evenodd" d="M36.2238,18.4961C35.2814,18.7404 31.6124,22.4835 28.0911,24.8738C24.5699,27.2638 19.8273,30.3105 14.0769,31.7709C7.9267,33.333 6.8318,32.7124 5.7143,34.0859C5.2795,34.0745 5.1362,34.655 5.071,35.2198C4.9462,36.3039 5.0048,39.9768 12.6984,41.6918C17.678,42.8018 34.478,42.3965 35.7644,42.4003C37.0507,42.4044 41.2782,42.495 41.2782,42.495C41.2782,42.495 43.5865,42.5422 44.6783,42.5422C48.2921,42.5422 54.0916,41.2344 53.3627,35.5976C53.3227,35.2886 51.526,28.8684 51.3868,28.3224C51.3031,27.9945 50.3908,24.9241 50.357,24.749C50.1065,23.4506 50.5104,23.0962 50.3878,22.6742C50.2866,22.3256 49.9166,22.181 49.9166,22.181C49.9166,22.181 50.0207,21.8255 49.7338,21.6731C49.447,21.5208 48.5223,21.9434 47.8947,22.7006C47.2673,23.4579 47.3946,24.2201 46.1029,24.6376C44.5508,25.1392 41.9085,25.0768 41.1403,24.8738C39.9328,24.5545 39.2564,23.6455 39.2564,23.6455C39.2564,23.6455 39.5858,21.5889 39.0267,20.1968C38.5733,19.0677 37.3896,18.575 37.0969,18.4961C36.8041,18.417 36.4946,18.426 36.2238,18.4961"/>
       </svg>
     </button>
 
-    <div style="display:flex;align-items:center;gap:8px">
-      <svg width="22" height="22" viewBox="0 0 80 55" fill="white" style="flex-shrink:0">
-        <path d="M4 44 Q18 28 38 22 Q55 18 74 24 L76 32 Q56 26 36 30 Q18 34 6 48 Z"/>
-        <path d="M6 48 Q24 38 36 30 Q56 26 76 32 L77 38 Q56 34 36 38 Q20 42 7 52 Z" opacity=".45"/>
-        <ellipse cx="20" cy="48" rx="5" ry="3" opacity=".3"/>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:5px;line-height:1">
+      <!-- authentic Nike swoosh (res/drawable/ic_swoosh.xml) -->
+      <svg width="52" height="20" viewBox="0 0 48 18" fill="white" style="flex-shrink:0">
+        <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
-      <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1">
-        <svg width="48" height="18" viewBox="0 0 100 38" fill="white">
-          <path d="M1 37 C28 37 90 3 99 3 C87 14 42 33 1 37 Z"/>
-        </svg>
-        <span id="app-version" style="font-size:0.52rem;color:rgba(255,255,255,0.45);letter-spacing:1px;margin-top:1px">v38</span>
-      </div>
+      <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v40</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -396,10 +417,21 @@
     </button>
   </header>
 
-  <!-- ── L / R ── -->
+  <!-- ── Shoe controller hero ── -->
   <div class="lr-view">
-    <div class="lr-l">L</div>
-    <div class="lr-r">R</div>
+    <div class="hero">
+      <div class="hero-status" id="hero-status">Non connecté</div>
+      <!-- authentic Adapt shoe silhouette (res/drawable/ic_shoe_adapt.xml), recoloured -->
+      <svg id="shoe-hero" class="shoe-hero" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#f3f3f5" fill-rule="evenodd" d="M36.2238,18.4961C35.2814,18.7404 31.6124,22.4835 28.0911,24.8738C24.5699,27.2638 19.8273,30.3105 14.0769,31.7709C7.9267,33.333 6.8318,32.7124 5.7143,34.0859C5.2795,34.0745 5.1362,34.655 5.071,35.2198C4.9462,36.3039 5.0048,39.9768 12.6984,41.6918C17.678,42.8018 34.478,42.3965 35.7644,42.4003C37.0507,42.4044 41.2782,42.495 41.2782,42.495C41.2782,42.495 43.5865,42.5422 44.6783,42.5422C48.2921,42.5422 54.0916,41.2344 53.3627,35.5976C53.3227,35.2886 51.526,28.8684 51.3868,28.3224C51.3031,27.9945 50.3908,24.9241 50.357,24.749C50.1065,23.4506 50.5104,23.0962 50.3878,22.6742C50.2866,22.3256 49.9166,22.181 49.9166,22.181C49.9166,22.181 50.0207,21.8255 49.7338,21.6731C49.447,21.5208 48.5223,21.9434 47.8947,22.7006C47.2673,23.4579 47.3946,24.2201 46.1029,24.6376C44.5508,25.1392 41.9085,25.0768 41.1403,24.8738C39.9328,24.5545 39.2564,23.6455 39.2564,23.6455C39.2564,23.6455 39.5858,21.5889 39.0267,20.1968C38.5733,19.0677 37.3896,18.575 37.0969,18.4961C36.8041,18.417 36.4946,18.426 36.2238,18.4961"/>
+        <path class="shoe-led" fill="#2b92ff" fill-rule="evenodd" d="M30.8318,40.5811C29.9338,40.5811 29.2058,39.7752 29.2058,38.7811C29.2058,37.787 29.9338,36.9811 30.8318,36.9811C31.7299,36.9811 32.4579,37.787 32.4579,38.7811C32.4579,39.7752 31.7299,40.5811 30.8318,40.5811M35.9425,40.5811C35.0444,40.5811 34.3164,39.7752 34.3164,38.7811C34.3164,37.787 35.0444,36.9811 35.9425,36.9811C36.8406,36.9811 37.5686,37.787 37.5686,38.7811C37.5686,39.7752 36.8406,40.5811 35.9425,40.5811"/>
+        <path fill="#101012" fill-rule="evenodd" d="M29.2361,35.0225C29.2312,35.0225 29.1795,35.0481 29.0811,35.0994C28.9827,35.1506 28.8523,35.214 28.6899,35.2895C28.5275,35.3651 28.3381,35.4459 28.1216,35.5321C27.9052,35.6182 27.674,35.6989 27.4282,35.7742C27.1822,35.8493 26.9266,35.9109 26.6611,35.9589C26.3957,36.0069 26.1328,36.0304 25.8724,36.0295C25.4991,36.0282 25.1713,35.9713 24.8893,35.859C24.6072,35.7467 24.3732,35.5924 24.1872,35.3961C24.0012,35.1998 23.8608,34.9657 23.7659,34.6938C23.6711,34.4218 23.6242,34.1281 23.6253,33.813C23.6265,33.4816 23.6817,33.1368 23.791,32.7786C23.9004,32.4204 24.0416,32.0636 24.2148,31.7083C24.388,31.3531 24.5795,31.0101 24.7895,30.6794C24.9994,30.3487 25.2056,30.0451 25.408,29.7688C25.6104,29.4924 25.7991,29.2539 25.9742,29.0536C26.1493,28.8531 26.2837,28.7068 26.3773,28.6148C26.1249,29.1573 25.9452,29.6253 25.8382,30.0188C25.7312,30.4123 25.6772,30.7558 25.6762,31.0493C25.675,31.3861 25.7293,31.6729 25.839,31.9096C25.9486,32.1464 26.0953,32.3384 26.279,32.4857C26.4628,32.6331 26.6712,32.7411 26.9043,32.8098C27.1374,32.8786 27.3792,32.9133 27.6297,32.9142C27.7329,32.9146 27.841,32.9082 27.954,32.895C28.0671,32.8818 28.1801,32.8646 28.2932,32.8432C28.4062,32.8218 28.5144,32.7978 28.6177,32.771C28.7209,32.7442 28.8144,32.72 28.8979,32.6986C29.0799,32.6449 29.67,32.4704 30.6683,32.1751C31.0961,32.0461 31.6321,31.8863 32.2764,31.6956C32.9206,31.505 33.7074,31.2701 34.6369,30.9908C35.5663,30.7115 36.6555,30.3866 37.9047,30.016C39.1538,29.6455 40.5946,29.2158 42.2274,28.7271L29.2361,35.0225Z"/>
+      </svg>
+      <div class="hero-fit">
+        <button class="fit-chip" onclick="openSheet('fit')"><span class="fc-side">L</span><span class="fc-val" id="hero-l">--</span></button>
+        <button class="fit-chip" onclick="openSheet('fit')"><span class="fc-side">R</span><span class="fc-val" id="hero-r">--</span></button>
+      </div>
+    </div>
   </div>
 
   <!-- ── Bottom nav ── -->
@@ -486,37 +518,49 @@
     <div class="ssub">Choisis la couleur des LEDs. L'interface s'adapte automatiquement.</div>
 
     <div class="led-grid">
-      <div class="led-item active" data-hex="#1db954" onclick="setLED(this)">
-        <div class="led-circle" style="background:#1db954"></div>
-        <div class="led-name">Vert</div>
+      <div class="led-item active" data-hex="#2b92ff" onclick="setLED(this)">
+        <div class="led-circle" style="background:#2b92ff"></div>
+        <div class="led-name">Hero Blue</div>
       </div>
-      <div class="led-item" data-hex="#fa5400" onclick="setLED(this)">
-        <div class="led-circle" style="background:#fa5400"></div>
-        <div class="led-name">Orange</div>
+      <div class="led-item" data-hex="#1e52ff" onclick="setLED(this)">
+        <div class="led-circle" style="background:#1e52ff"></div>
+        <div class="led-name">Racer Blue</div>
       </div>
-      <div class="led-item" data-hex="#0071e3" onclick="setLED(this)">
-        <div class="led-circle" style="background:#0071e3"></div>
-        <div class="led-name">Bleu</div>
+      <div class="led-item" data-hex="#2ffcff" onclick="setLED(this)">
+        <div class="led-circle" style="background:#2ffcff"></div>
+        <div class="led-name">Aurora Green</div>
       </div>
-      <div class="led-item" data-hex="#ff2d55" onclick="setLED(this)">
-        <div class="led-circle" style="background:#ff2d55"></div>
-        <div class="led-name">Rouge</div>
+      <div class="led-item" data-hex="#abff35" onclick="setLED(this)">
+        <div class="led-circle" style="background:#abff35"></div>
+        <div class="led-name">Electric Green</div>
       </div>
-      <div class="led-item" data-hex="#9b59b6" onclick="setLED(this)">
-        <div class="led-circle" style="background:#9b59b6"></div>
-        <div class="led-name">Violet</div>
+      <div class="led-item" data-hex="#27cb06" onclick="setLED(this)">
+        <div class="led-circle" style="background:#27cb06"></div>
+        <div class="led-name">Green Spark</div>
       </div>
-      <div class="led-item" data-hex="#f0c000" onclick="setLED(this)">
-        <div class="led-circle" style="background:#f0c000"></div>
-        <div class="led-name">Jaune</div>
+      <div class="led-item" data-hex="#fffc00" onclick="setLED(this)">
+        <div class="led-circle" style="background:#fffc00"></div>
+        <div class="led-name">Opti Yellow</div>
       </div>
-      <div class="led-item" data-hex="#e8590c" onclick="setLED(this)">
-        <div class="led-circle" style="background:#e8590c"></div>
-        <div class="led-name">Corail</div>
+      <div class="led-item" data-hex="#ff6400" onclick="setLED(this)">
+        <div class="led-circle" style="background:#ff6400"></div>
+        <div class="led-name">Total Orange</div>
       </div>
-      <div class="led-item" data-hex="#00bcd4" onclick="setLED(this)">
-        <div class="led-circle" style="background:#00bcd4"></div>
-        <div class="led-name">Cyan</div>
+      <div class="led-item" data-hex="#ff2b00" onclick="setLED(this)">
+        <div class="led-circle" style="background:#ff2b00"></div>
+        <div class="led-name">Bright Crimson</div>
+      </div>
+      <div class="led-item" data-hex="#ee4b75" onclick="setLED(this)">
+        <div class="led-circle" style="background:#ee4b75"></div>
+        <div class="led-name">Red Orbit</div>
+      </div>
+      <div class="led-item" data-hex="#ff80e3" onclick="setLED(this)">
+        <div class="led-circle" style="background:#ff80e3"></div>
+        <div class="led-name">Pink Blast</div>
+      </div>
+      <div class="led-item" data-hex="#8f00ff" onclick="setLED(this)">
+        <div class="led-circle" style="background:#8f00ff"></div>
+        <div class="led-name">Vivid Purple</div>
       </div>
       <div class="led-item" data-hex="#1c1c1e" onclick="setLED(this)">
         <div class="led-circle" style="background:#2a2a2c;border:2px solid rgba(255,255,255,.2)"></div>
@@ -754,40 +798,50 @@
 // ════════════════════════════════════
 // LED Colors & Background
 // ════════════════════════════════════
+// Authentic Nike Adapt LED palette — names + hexes lifted straight from the
+// app's res/values/colors.xml (the "_palette" swatch, "_dynamic" used as glow).
 const LED_COLORS = {
-  '#1db954': { light: '#38e07a', dark: '#0d8a3a', name: 'Vert'    },
-  '#fa5400': { light: '#fc7a30', dark: '#b33a00', name: 'Orange'  },
-  '#0071e3': { light: '#3395f5', dark: '#004fa0', name: 'Bleu'    },
-  '#ff2d55': { light: '#ff5c75', dark: '#b30028', name: 'Rouge'   },
-  '#9b59b6': { light: '#b87fd4', dark: '#6c3483', name: 'Violet'  },
-  '#f0c000': { light: '#f5d44a', dark: '#a07e00', name: 'Jaune'   },
-  '#e8590c': { light: '#f07840', dark: '#9e3c07', name: 'Corail'  },
-  '#00bcd4': { light: '#4dd8e8', dark: '#007a8a', name: 'Cyan'    },
-  '#1c1c1e': { light: '#3a3a3c', dark: '#0a0a0a', name: 'Off'     },
+  '#2b92ff': { glow: '#2ec1ff', name: 'Hero Blue'      },
+  '#1e52ff': { glow: '#3a6cff', name: 'Racer Blue'     },
+  '#2ffcff': { glow: '#2cffd5', name: 'Aurora Green'   },
+  '#abff35': { glow: '#d3ff82', name: 'Electric Green' },
+  '#27cb06': { glow: '#00c952', name: 'Green Spark'    },
+  '#fffc00': { glow: '#feff00', name: 'Opti Yellow'    },
+  '#ff6400': { glow: '#ff6700', name: 'Total Orange'   },
+  '#ff2b00': { glow: '#f00200', name: 'Bright Crimson' },
+  '#ee4b75': { glow: '#ff77ad', name: 'Red Orbit'      },
+  '#ff80e3': { glow: '#ffc2f0', name: 'Pink Blast'     },
+  '#8f00ff': { glow: '#a740ff', name: 'Vivid Purple'   },
+  '#1c1c1e': { glow: '#2a2a2c', name: 'Off'            },
 };
-const DISCONNECTED_BG = 'radial-gradient(ellipse at 30% 20%, #2a4a6b, #0d1f33 70%)';
 
-let currentLed = '#1db954';
+let currentLed = '#2b92ff';   // default: Hero Blue (matches the Adapt shoe LED dots)
 let brightness = 80;
 
+// Original "shoe controller" look: a pure-black screen with a soft glow of the
+// current LED colour pooling at top and bottom — not a full vivid gradient.
+function ledGradient(hex) {
+  const info = LED_COLORS[hex] || { glow: hex };
+  if (hex === '#1c1c1e') return 'radial-gradient(120% 80% at 50% 115%, #1c1c1e55, transparent 60%), #000';
+  return `radial-gradient(125% 75% at 50% 6%, ${info.glow}26, transparent 52%),`
+       + `radial-gradient(130% 95% at 50% 118%, ${hex}3a, transparent 60%), #000`;
+}
+
 function applyBackground(hex) {
+  const gradient = ledGradient(hex);
   const bg = document.getElementById('bg');
-  const info = LED_COLORS[hex] || { light: '#38e07a', dark: '#0d8a3a' };
-  let gradient;
-  if (hex === '#1c1c1e') {
-    gradient = 'radial-gradient(ellipse at 28% 18%, #2a2a2c, #0a0a0a 75%)';
-  } else {
-    gradient = `radial-gradient(ellipse at 28% 18%, ${info.light} 0%, ${hex} 45%, ${info.dark} 100%)`;
-  }
-  bg.style.background = gradient;
-  // Apply same bg to colored sheets (not config which has its own dark bg)
+  if (bg) bg.style.background = gradient;
+  // sheets share the same dark glow
   ['sbg-fit','sbg-led','sbg-battery','sbg-more','sbg-modes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.background = gradient;
   });
-  // LED dot in nav
+  // glow the LED dot in the nav + the shoe hero on the home screen
   const dot = document.getElementById('led-dot-btn');
-  if (dot) dot.style.background = hex === '#1c1c1e' ? '#3a3a3c' : hex;
+  if (dot) { dot.style.background = hex === '#1c1c1e' ? '#3a3a3c' : hex; dot.style.boxShadow = hex === '#1c1c1e' ? 'none' : `0 0 10px ${hex}`; }
+  document.querySelectorAll('.shoe-led').forEach(d => { d.style.fill = hex === '#1c1c1e' ? '#3a3a3c' : hex; });
+  const hero = document.getElementById('shoe-hero');
+  if (hero) hero.style.filter = hex === '#1c1c1e' ? 'none' : `drop-shadow(0 14px 40px ${hex}55)`;
 }
 
 function setLED(el) {
@@ -1859,7 +1913,14 @@ function updateFit(side, val) {
   ST[side].fit = val;
   gid('sl-'+side).value = val;
   gid('fpct-'+side[0]).textContent = val + '%';
+  const h = gid('hero-'+side[0]); if (h) h.textContent = val;
   if (shoes[side].connected) shoes[side].setTightness(val);
+}
+
+function updateHeroStatus() {
+  const on = shoes.left.device?.gatt?.connected || shoes.right.device?.gatt?.connected;
+  const el = gid('hero-status');
+  if (el) { el.textContent = on ? 'Connecté' : 'Non connecté'; el.classList.toggle('on', !!on); }
 }
 
 function applyPreset(el) {
@@ -1901,6 +1962,7 @@ function setShoeUI(side, state, name) {
   const connEl = gid('sc-conn-'+s);
   const nameEl = gid('sc-name-'+s);
   const btnEl  = gid('sc-btn-'+s);
+  setTimeout(updateHeroStatus, 0);
 
   if (state==='connecting') {
     connEl.textContent='Connexion…'; connEl.style.color='#ff9f0a';
@@ -2090,6 +2152,9 @@ function init() {
   if (gid('max-r')) gid('max-r').textContent = maxR;
   gid('fpct-l').textContent = ST.left.fit  + '%';
   gid('fpct-r').textContent = ST.right.fit + '%';
+  if (gid('hero-l')) gid('hero-l').textContent = ST.left.fit;
+  if (gid('hero-r')) gid('hero-r').textContent = ST.right.fit;
+  applyBackground(currentLed);
 
   if (!navigator.bluetooth) {
     const w=gid('no-ble-warn'); if(w) w.style.display='block';
@@ -2114,7 +2179,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v39 — auth CoreRF challenge-response (clés ${SHOE_DATA.left.authKey ? '✓' : '⚠'})`);
+  log('info', `App version: v40 — UI Nike d'origine + auth CoreRF (clés ${SHOE_DATA.left.authKey ? '✓' : '⚠'})`);
 }
 
 init();
