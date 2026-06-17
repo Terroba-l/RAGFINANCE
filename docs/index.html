@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v40</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v41</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -948,6 +948,7 @@ const OP = {
   SERVO_MOVE: 0, SERVO_PRESET_SET: 1, SERVO_PRESET_GET: 2,
   SERVO_POSITION_SET: 3, SERVO_POSITION_GET: 4, SERVO_MOVE_COMPLETE_EVENT: 5,
   IDENTIFY: 20, SERIAL_NUMBER_GET: 50, BATTERY_CHARGER_STATE_GET: 81, TOGGLE_FPS: 82,
+  START_AUTH_KEY_GENERATION: 110, EXCHANGE_PUBLIC_KEY: 111,
   START_AUTHENTICATION: 112, AUTHENTICATION_CHALLENGE: 113, SYSTEM_STATS_GET: 121,
   SET_LED_BASE: 130, ANIMATION_SET_COLOR: 222,
 };
@@ -990,6 +991,7 @@ function corerfParse(buf) {
   const len = ((b2 & 0x3F) << 8) | b1;
   return { opcode, msgType, payload: buf.slice(3, 3 + len) };
 }
+function bytesEq(a, b) { if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 
 class NikeShoe {
   constructor(side) {
@@ -1082,39 +1084,79 @@ class NikeShoe {
   //   3. ← ACK { encryptedPhoneNonce, deviceNonce }      (extract deviceNonce = field 2)
   //   4. → AUTHENTICATION_CHALLENGE { AES-128-ECB(authKey, deviceNonce) }
   //   5. ← ACK  ⇒ authenticated
-  async _auth() {
-    this._authOK = false;
-    const authKey = h2b(SHOE_DATA[this.side].authKey);
+  // Candidate keys to try: the two factory-extracted keys + any key we imprinted
+  // ourselves (saved in localStorage by device name). The shoe echoes
+  // AES(realKey, phoneNonce) as encryptedPhoneNonce, so we can pick the right one.
+  _candidateKeys() {
+    const out = [
+      { name: 'extraite LEFT',  bytes: h2b(SHOE_DATA.left.authKey)  },
+      { name: 'extraite RIGHT', bytes: h2b(SHOE_DATA.right.authKey) },
+    ];
+    try {
+      const saved = JSON.parse(localStorage.getItem('imprintedKeys') || '{}');
+      for (const [dev, hex] of Object.entries(saved)) out.unshift({ name: `imprintée (${dev})`, bytes: h2b(hex) });
+    } catch {}
+    return out;
+  }
 
-    // 1 + 2 — send our random nonce
+  async _auth() {
+    this._authOK = false; this._authKey = null; this._canImprint = false;
+    const dev = this.device?.name || this.label;
+
+    // 1+2 — send our random phoneNonce
     const phoneNonce = crypto.getRandomValues(new Uint8Array(16));
-    log('tx', `[${this.label}] START_AUTHENTICATION phoneNonce=${b2h(phoneNonce)}`);
+    log('tx', `[${dev}] START_AUTHENTICATION phoneNonce=${b2h(phoneNonce)}`);
     const ackPayload = await this._sendMessage(
       OP.START_AUTHENTICATION, MT.REQUEST, new Uint8Array(pbBytes(1, phoneNonce)), { timeout: 6000 });
-    if (ackPayload == null) { log('err', `[${this.label}] Auth: pas de réponse à START_AUTHENTICATION`); return false; }
+    if (ackPayload == null) { log('err', `[${dev}] Auth: pas de réponse à START_AUTHENTICATION`); return false; }
 
-    // 3 — pull deviceNonce (field 2) from StartAuthenticationACK
+    // 3 — StartAuthenticationACK { encryptedPhoneNonce=1, deviceNonce=2 }
     const ack = pbDecode(ackPayload);
-    const deviceNonce = ack[2] && ack[2].bytes;
+    const encPhoneNonce = ack[1] && ack[1].bytes;
+    const deviceNonce   = ack[2] && ack[2].bytes;
     if (!deviceNonce || deviceNonce.length !== 16) {
-      log('err', `[${this.label}] Auth: deviceNonce invalide (${ackPayload.length}B payload)`); return false;
+      log('err', `[${dev}] Auth: deviceNonce invalide (${ackPayload.length}B)`); return false;
     }
-    log('rx', `[${this.label}] deviceNonce=${b2h(deviceNonce)}`);
+    log('rx', `[${dev}] deviceNonce=${b2h(deviceNonce)}`);
+
+    // 3b — identify which key the shoe is really using, by matching its
+    //      encryptedPhoneNonce = AES(realKey, phoneNonce) against our candidates.
+    let authKey = null, authKeyName = '';
+    if (encPhoneNonce && encPhoneNonce.length === 16) {
+      for (const c of this._candidateKeys()) {
+        if (bytesEq(await aesEcb(c.bytes, phoneNonce), encPhoneNonce)) { authKey = c.bytes; authKeyName = c.name; break; }
+      }
+    }
+
+    if (!authKey) {
+      log('err', `[${dev}] ⚠️ Aucune clé connue ne correspond — clé périmée (la chaussure a été ré-imprintée).`);
+      // ask the shoe whether it will (re)imprint a fresh key
+      const kg = await this._sendMessage(OP.START_AUTH_KEY_GENERATION, MT.REQUEST, new Uint8Array(0), { timeout: 5000 });
+      if (kg != null) {
+        const grp = (pbDecode(kg)[1] || {}).val;
+        this._canImprint = true; this._imprintGroup = grp;
+        log('rx', `[${dev}] 🔑 RÉ-IMPRINT POSSIBLE — la chaussure propose le groupe DH = ${grp}. Lance "Ré-imprinter".`);
+      } else {
+        log('err', `[${dev}] ✗ La chaussure refuse la génération de clé (NAK/timeout) — un factory reset physique sera nécessaire.`);
+      }
+      return false;
+    }
+
+    log('rx', `[${dev}] 🔑 Clé reconnue: ${authKeyName}`);
 
     // 4 — answer the challenge: AES-128-ECB(authKey, deviceNonce)
     const encDeviceNonce = await aesEcb(authKey, deviceNonce);
-    log('tx', `[${this.label}] AUTHENTICATION_CHALLENGE enc=${b2h(encDeviceNonce)}`);
+    log('tx', `[${dev}] AUTHENTICATION_CHALLENGE enc=${b2h(encDeviceNonce)}`);
     const res = await this._sendMessage(
       OP.AUTHENTICATION_CHALLENGE, MT.REQUEST, new Uint8Array(pbBytes(1, encDeviceNonce)), { timeout: 6000 });
 
-    // 5 — any ACK (non-null payload, even empty) means success
     if (res != null) {
-      this._authOK = true;
-      log('rx', `[${this.label}] ✅ AUTH OK`);
+      this._authOK = true; this._authKey = authKey;
+      log('rx', `[${dev}] ✅ AUTH OK (${authKeyName})`);
       toast(`✅ ${this.label} authentifiée`);
       return true;
     }
-    log('err', `[${this.label}] ✗ Auth refusée (NAK/timeout)`);
+    log('err', `[${dev}] ✗ Challenge refusé (NAK)`);
     return false;
   }
 
@@ -1589,7 +1631,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v40 — UI Nike d'origine + auth CoreRF (clés ${SHOE_DATA.left.authKey ? '✓' : '⚠'})`);
+  log('info', `App version: v41 — auth multi-clés + détection ré-imprint`);
 }
 
 init();
