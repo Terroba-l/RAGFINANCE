@@ -1222,12 +1222,74 @@ const STEP2_PROBES = [
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ══════════════════════════════════════════════════════════════════════════
+// CoreRF / Bigfoot protocol — reverse-engineered from the official
+// com.nike.adapt Android APK (jadx decompile). This is the GROUND TRUTH that
+// replaces the old brute-force probe approach.
+//   · Message framing : com.nike.corerf.bigfoot.f  (Message.java)
+//   · Opcodes         : com.nike.corerf.bigfoot.b  (BigfootOperationCode.java)
+//   · Ripley transport: xa.h0 (TransportScatter) + bigfoot.c (CoreRF.java)
+//   · Auth flow       : xa.g.r() + r0.v + i4.u  (challenge-response, NOT DH)
+// See PROTOCOL.md for the full write-up.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Bigfoot operation codes (subset we use)
+const OP = {
+  SERVO_MOVE: 0, SERVO_PRESET_SET: 1, SERVO_PRESET_GET: 2,
+  SERVO_POSITION_SET: 3, SERVO_POSITION_GET: 4, SERVO_MOVE_COMPLETE_EVENT: 5,
+  IDENTIFY: 20, SERIAL_NUMBER_GET: 50, BATTERY_CHARGER_STATE_GET: 81, TOGGLE_FPS: 82,
+  START_AUTHENTICATION: 112, AUTHENTICATION_CHALLENGE: 113, SYSTEM_STATS_GET: 121,
+  SET_LED_BASE: 130, ANIMATION_SET_COLOR: 222,
+};
+// Message type (2 high bits of frame byte 2)
+const MT = { REQUEST: 0, ACK: 1, NAK: 2, EVENT: 3 };
+// ServoMove.ServoCommand
+const SERVO = {
+  HOME: 0, SHORT_TIGHTEN: 1, LONG_TIGHTEN: 2, SHORT_LOOSEN: 3, LONG_LOOSEN: 4,
+  MAX_TIGHTEN: 5, MAX_LOOSEN: 6, AUTOLACE: 7, STOP: 8, HUG: 9,
+};
+
+// ── Minimal protobuf (proto3) encode/decode ───────────────────────────────
+function pbVarint(n) { const o = []; n >>>= 0; while (n > 0x7f) { o.push((n & 0x7f) | 0x80); n >>>= 7; } o.push(n); return o; }
+function pbUint32(field, val) { return [(field << 3) | 0, ...pbVarint(val)]; }              // wire 0
+function pbBytes(field, bytes) { return [(field << 3) | 2, ...pbVarint(bytes.length), ...bytes]; } // wire 2
+function pbDecode(buf) {
+  const out = {}; let i = 0;
+  while (i < buf.length) {
+    const tag = buf[i++], field = tag >> 3, wire = tag & 7;
+    if (wire === 0) { let s = 0, v = 0; while (true) { const b = buf[i++]; v |= (b & 0x7f) << s; if (!(b & 0x80)) break; s += 7; } out[field] = { wire, val: v >>> 0 }; }
+    else if (wire === 2) { let len = 0, s = 0; while (true) { const b = buf[i++]; len |= (b & 0x7f) << s; if (!(b & 0x80)) break; s += 7; } out[field] = { wire, bytes: buf.slice(i, i + len) }; i += len; }
+    else if (wire === 1) { out[field] = { wire, bytes: buf.slice(i, i + 8) }; i += 8; }
+    else if (wire === 5) { out[field] = { wire, bytes: buf.slice(i, i + 4) }; i += 4; }
+    else break;
+  }
+  return out;
+}
+
+// ── CoreRF message framing (Message.java f.b / f.a) ────────────────────────
+// [ opcode ][ len & 0xFF ][ (len>>8) | (msgType<<6) ][ payload… ]
+function corerfFrame(opcode, msgType, payload) {
+  payload = payload || new Uint8Array(0);
+  const len = payload.length;
+  return new Uint8Array([opcode & 0xFF, len & 0xFF, ((len >> 8) & 0x3F) | ((msgType & 3) << 6), ...payload]);
+}
+function corerfParse(buf) {
+  if (!buf || buf.length < 3) return null;
+  const opcode = buf[0], b1 = buf[1], b2 = buf[2];
+  const msgType = (b2 & 0xC0) >> 6;
+  const len = ((b2 & 0x3F) << 8) | b1;
+  return { opcode, msgType, payload: buf.slice(3, 3 + len) };
+}
+
 class NikeShoe {
   constructor(side) {
     this.side = side;
     this.label = side === 'left' ? 'Gauche' : 'Droite';
     this.device = this.server = this.wChar = this.nChar = null;
     this.battery = null; this.connected = false; this._authOK = false; this._kaTimer = null; this._currentFit = null; this._challengeResolve = null;
+    this._seq = 0;        // Ripley rolling sequence (mod 64), reset on each connect
+    this._rx = [];        // Ripley reassembly buffer
+    this._pending = null; // in-flight request awaiting its ACK/NAK
   }
 
   async connect() {
@@ -1258,6 +1320,7 @@ class NikeShoe {
     this.device.addEventListener('gattserverdisconnected',()=>this._disc());
     this.server = await this.device.gatt.connect();
     await this._discover();
+    this._seq = 0; this._rx = []; this._pending = null;   // fresh Ripley state per connection
     await this._auth();
     await this._readDeviceInfo();
     await this._readBatt();
@@ -1301,53 +1364,76 @@ class NikeShoe {
     renderDisc(this.side, found);
   }
 
+  // Per-connection authentication — challenge/response with the imprinted authKey.
+  // (The Diffie-Hellman flow is ONLY for first-time imprinting, which is already done;
+  //  we hold the imprinted key, so we never do DH here.)  Ref: xa.g.r()
+  //   1. phoneNonce = 16 random bytes
+  //   2. → START_AUTHENTICATION { phoneNonce }
+  //   3. ← ACK { encryptedPhoneNonce, deviceNonce }      (extract deviceNonce = field 2)
+  //   4. → AUTHENTICATION_CHALLENGE { AES-128-ECB(authKey, deviceNonce) }
+  //   5. ← ACK  ⇒ authenticated
   async _auth() {
     this._authOK = false;
-    this._challengeResolve = null;
+    const authKey = h2b(SHOE_DATA[this.side].authKey);
 
-    // Step1 initial — triggers shoe to respond with C0 xx (StartAuthKeyGen)
-    const step1 = new Uint8Array([0x01, 0x10, ...h2b(SHOE_DATA[this.side].authKey)]);
-    log('tx', `[${this.label}] Auth step1 → ${b2h(step1)}`);
-    try { await this._write(step1); } catch(e) { log('err', `Auth: ${e.message}`); return; }
+    // 1 + 2 — send our random nonce
+    const phoneNonce = crypto.getRandomValues(new Uint8Array(16));
+    log('tx', `[${this.label}] START_AUTHENTICATION phoneNonce=${b2h(phoneNonce)}`);
+    const ackPayload = await this._sendMessage(
+      OP.START_AUTHENTICATION, MT.REQUEST, new Uint8Array(pbBytes(1, phoneNonce)), { timeout: 6000 });
+    if (ackPayload == null) { log('err', `[${this.label}] Auth: pas de réponse à START_AUTHENTICATION`); return false; }
 
-    // Boucle : le shoe envoie C0 xx (StartAuthKeyGen) → on tente un probe
-    // _challengeResolve se déclenche sur TOUTE notification pour voir la réponse du shoe
+    // 3 — pull deviceNonce (field 2) from StartAuthenticationACK
+    const ack = pbDecode(ackPayload);
+    const deviceNonce = ack[2] && ack[2].bytes;
+    if (!deviceNonce || deviceNonce.length !== 16) {
+      log('err', `[${this.label}] Auth: deviceNonce invalide (${ackPayload.length}B payload)`); return false;
+    }
+    log('rx', `[${this.label}] deviceNonce=${b2h(deviceNonce)}`);
+
+    // 4 — answer the challenge: AES-128-ECB(authKey, deviceNonce)
+    const encDeviceNonce = await aesEcb(authKey, deviceNonce);
+    log('tx', `[${this.label}] AUTHENTICATION_CHALLENGE enc=${b2h(encDeviceNonce)}`);
+    const res = await this._sendMessage(
+      OP.AUTHENTICATION_CHALLENGE, MT.REQUEST, new Uint8Array(pbBytes(1, encDeviceNonce)), { timeout: 6000 });
+
+    // 5 — any ACK (non-null payload, even empty) means success
+    if (res != null) {
+      this._authOK = true;
+      log('rx', `[${this.label}] ✅ AUTH OK`);
+      toast(`✅ ${this.label} authentifiée`);
+      return true;
+    }
+    log('err', `[${this.label}] ✗ Auth refusée (NAK/timeout)`);
+    return false;
+  }
+
+  // legacy probe loop (kept for the manual probe UI; not used by connect)
+  async _authProbeLoop() {
     while (this.device?.gatt?.connected && !this._authOK && !this._stopProbes) {
       const notif = await Promise.race([
         new Promise(r => { this._challengeResolve = r; }),
         sleep(6000).then(() => null),
       ]);
       this._challengeResolve = null;
-
       if (notif === null || !this.device?.gatt?.connected) break;
-
       const { opcode, second, data } = notif;
       const opcHex = opcode.toString(16).padStart(2,'0').toUpperCase();
-
-      // AUTH OK on FE 00
       if (opcode === 0xFE && second === 0x00) { this._authOK = true; break; }
-
-      // Only run probes when shoe sends C0 xx (StartAuthKeyGen / periodic status)
-      // Other notifications (FE 02 NACK, E8 02, etc.) are already logged — skip probe
       if (opcode !== 0xC0) {
         log('info', `[${this.label}] Notif ${opcHex} ${second.toString(16).padStart(2,'0').toUpperCase()} (${data.length}B) — pas C0, skip probe`);
         continue;
       }
-
       const challenge = second;
       log('rx', `[${this.label}] Challenge: C0 ${challenge.toString(16).padStart(2,'0').toUpperCase()}`);
-
       const probe = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
       log('info', `[${this.label}] Step2 probe #${step2ProbeIndex}: "${probe.label}"`);
-      // Incrémenter avant fn() — évite le blocage si fn() throw (ex: AES-dec padding invalid)
       step2ProbeIndex++;
       localStorage.setItem('step2ProbeIdx', step2ProbeIndex);
       updateProbeStatus();
-
       let step2bytes;
       try { step2bytes = await probe.fn(h2b(SHOE_DATA[this.side].authKey), challenge, this); }
-      catch(e) { log('err', `[${this.label}] Probe fn: ${e.message}`); } // undefined → skip
-
+      catch(e) { log('err', `[${this.label}] Probe fn: ${e.message}`); }
       if (step2bytes instanceof Uint8Array && step2bytes.length > 0) {
         log('tx', `[${this.label}] Auth step2 → ${b2h(step2bytes)}`);
         try { await this._write(step2bytes); } catch { if (!this.device?.gatt?.connected) break; }
@@ -1397,35 +1483,56 @@ class NikeShoe {
     }
   }
 
+  // Lace tightness via SERVO_POSITION_SET { positionPercentage } (0–100).  Ref: xa.g
   async setTightness(val) {
     if (!this.connected || !this.wChar) {
       log('err', `[${this.label}] setTightness(${val}) ignoré — connected=${this.connected} wChar=${!!this.wChar}`);
       return false;
     }
-    const raw = Math.min(Math.round(val), SHOE_DATA[this.side].maxTightness);
-    // Try both known formats
-    const cmds = [
-      new Uint8Array([...h2b(P.tight), raw]),          // E8 [val]
-      new Uint8Array([0x01, 0x01, raw]),                 // 01 01 [val]
-    ];
-    for (const cmd of cmds) {
-      try {
-        await this._write(cmd);
-        log('tx', `[${this.label}] Tight ${val} → ${b2h(cmd)}`);
-        await sleep(400);
-      } catch(e) { log('err', `Tight: ${e.message}`); }
-    }
-    return true;
+    if (!this._authOK) { log('err', `[${this.label}] setTightness ignoré — non authentifiée`); return false; }
+    const pos = Math.max(0, Math.min(Math.round(val), 100));
+    const payload = new Uint8Array(pbUint32(1, pos)); // ServoPosition.positionPercentage = field 1
+    const res = await this._sendMessage(OP.SERVO_POSITION_SET, MT.REQUEST, payload, { timeout: 5000 });
+    log(res != null ? 'tx' : 'err', `[${this.label}] Position ${pos}% → ${res != null ? 'ACK' : 'NAK/timeout'}`);
+    return res != null;
   }
 
-  async setLED(r,g,b) {
-    if (!this.connected||!this.wChar) return false;
-    try {
-      const cmd = new Uint8Array([...h2b(P.led), r, g, b]);
-      await this._write(cmd);
-      log('tx',`[${this.label}] LED(${r},${g},${b}): ${b2h(cmd)}`);
-      return true;
-    } catch(e){ log('err',`LED: ${e.message}`); return false; }
+  // Discrete servo moves (ServoMove.ServoCommand).  Ref: xa.g + Bigfoot.proto
+  async servo(cmd) {
+    if (!this.connected || !this.wChar || !this._authOK) return false;
+    const res = await this._sendMessage(OP.SERVO_MOVE, MT.REQUEST, new Uint8Array(pbUint32(1, cmd)), { timeout: 5000 });
+    return res != null;
+  }
+  tighten()  { return this.servo(SERVO.SHORT_TIGHTEN); }
+  loosen()   { return this.servo(SERVO.SHORT_LOOSEN); }
+  maxTight() { return this.servo(SERVO.MAX_TIGHTEN); }
+  unlace()   { return this.servo(SERVO.MAX_LOOSEN); }
+  stopServo(){ return this.servo(SERVO.STOP); }
+
+  // LED colour. Firmware ≥ 2.1.7 uses ANIMATION_SET_COLOR with 16-bit channels
+  // (r,g,b × 256), AnimationColor{ color_id=4, red, green, blue }.  Ref: xa.g.u()
+  async setLED(r, g, b) {
+    if (!this.connected || !this.wChar || !this._authOK) return false;
+    const payload = new Uint8Array([
+      ...pbUint32(1, 4),         // color_id
+      ...pbUint32(2, r * 256),   // red_output
+      ...pbUint32(3, g * 256),   // green_output
+      ...pbUint32(4, b * 256),   // blue_output
+    ]);
+    const res = await this._sendMessage(OP.ANIMATION_SET_COLOR, MT.REQUEST, payload, { timeout: 5000 });
+    log(res != null ? 'tx' : 'err', `[${this.label}] LED(${r},${g},${b}) → ${res != null ? 'ACK' : 'NAK/timeout'}`);
+    return res != null;
+  }
+
+  // Battery via the Bigfoot protocol (BatteryChargerState.batteryPercent = field 4)
+  async getBattery() {
+    if (!this.connected || !this.wChar || !this._authOK) return null;
+    const payload = await this._sendMessage(OP.BATTERY_CHARGER_STATE_GET, MT.REQUEST, new Uint8Array(0), { timeout: 4000 });
+    if (payload == null) return null;
+    const d = pbDecode(payload);
+    const pct = d[4] ? d[4].val : null;
+    if (pct != null) { this.battery = pct; updateBattUI(this.side, pct); log('rx', `[${this.label}] Batt: ${pct}%`); }
+    return pct;
   }
 
   async sendRaw(hex) {
@@ -1434,48 +1541,64 @@ class NikeShoe {
     log('tx',`[${this.label}] RAW: ${b2h(cmd)}`);
   }
 
-  async _write(bytes) {
-    // Full write cascade — Bluefy on iOS does NOT support writeValueWithResponse
-    // iOS MTU is typically ~182B so writeValueWithoutResponse may handle large payloads directly
-    if (this.wChar.properties.writeWithoutResponse) {
-      try { await this.wChar.writeValueWithoutResponse(bytes); return; }
-      catch(e) {
-        if (bytes.length <= 20) throw e; // small payloads MUST succeed
-        log('info',`[${this.label}] writeWithoutResponse(${bytes.length}B): ${e?.message ?? e}`);
-      }
-    }
-    if (typeof this.wChar.writeValueWithResponse === 'function') {
-      try { await this.wChar.writeValueWithResponse(bytes); return; }
-      catch(e) { log('info',`[${this.label}] writeValueWithResponse: ${e?.message ?? e}`); }
-    }
-    const ab = bytes.buffer instanceof ArrayBuffer ? bytes.buffer : bytes;
-    try { await this.wChar.writeValue(ab); return; }
-    catch(e) {
-      log('info',`[${this.label}] writeValue(${bytes.length}B): ${e?.message ?? e}`);
-      if (bytes.length <= 20) throw e;
-    }
-    // All BLE-level writes failed for large payload → Ripley application-layer segmentation
-    // Strip single-segment Ripley header (0x01) if already present, then re-fragment
-    log('info',`[${this.label}] → Ripley segmentation for ${bytes.length}B`);
-    const inner = (bytes.length > 1 && bytes[0] === 0x01) ? bytes.slice(1) : bytes;
-    await this._writeRipley(inner);
+  // ── Core request/response (matches xa.g.f17655i.k + the BroadcastReceiver) ──
+  // Frame a CoreRF message, Ripley-segment it, write it, and wait for the ACK/NAK
+  // whose opcode matches what we sent. Returns the ACK payload (Uint8Array, maybe
+  // empty) on success, or null on NAK / timeout.
+  async _sendMessage(opcode, msgType, payload, opts = {}) {
+    if (!this.wChar) return null;
+    const timeout = opts.timeout || 3000;
+    this._rx = [];                       // start clean so a stray segment can't corrupt us
+    const frame = corerfFrame(opcode, msgType, payload);
+    const wait = new Promise(resolve => { this._pending = { opcode, resolve }; });
+    try { await this._writeFramed(frame); }
+    catch (e) { this._pending = null; log('err', `[${this.label}] write op=0x${opcode.toString(16)}: ${e?.message ?? e}`); return null; }
+    const res = await Promise.race([wait, sleep(timeout).then(() => '__t__')]);
+    this._pending = null;
+    if (res === '__t__') { log('err', `[${this.label}] timeout op=0x${opcode.toString(16)}`); return null; }
+    if (res.msgType === MT.NAK) { log('err', `[${this.label}] NAK op=0x${opcode.toString(16)}`); return null; }
+    return res.payload;                  // ACK
   }
 
-  // Ripley application-layer segmentation: fragment innerPayload into BLE-sized chunks
-  // Each chunk: header = (segIndex << 1) | lastBit, then up to chunkSize payload bytes
-  // Matches the Bigfoot.framework/CoreRF Ripley transport seen in the iOS binary
+  // Ripley transport (xa.h0.b): split the framed message into ≤19-byte chunks,
+  // each prefixed with a 1-byte header = rolling sequence (mod 64); the LAST
+  // segment has bit 0x80 set. The sequence counter persists across messages.
+  async _writeFramed(frame) {
+    const chunks = [];
+    for (let i = 0; i < frame.length; i += 19) chunks.push(frame.slice(i, i + 19));
+    if (chunks.length === 0) chunks.push(new Uint8Array(0));
+    for (let i = 0; i < chunks.length; i++) {
+      let hdr = this._seq & 0x3F;
+      this._seq = (this._seq + 1) & 0x3F;
+      if (i === chunks.length - 1) hdr |= 0x80;       // last-segment marker
+      const pkt = new Uint8Array([hdr, ...chunks[i]]);
+      await this.wChar.writeValueWithoutResponse(pkt);
+      if (i < chunks.length - 1) await sleep(12);      // small inter-segment gap
+    }
+  }
+
+  // direct single-packet write — raw/debug only (sendRaw, battery fallback)
+  async _write(bytes) {
+    try { await this.wChar.writeValueWithoutResponse(bytes); return; }
+    catch (e) {
+      if (typeof this.wChar.writeValue === 'function') {
+        const ab = bytes.buffer instanceof ArrayBuffer ? bytes.buffer : bytes;
+        await this.wChar.writeValue(ab); return;
+      }
+      throw e;
+    }
+  }
+
+  // legacy Ripley fragmenter used by the old DH probes (kept so those buttons don't crash)
   async _writeRipley(innerPayload, chunkSize = 19) {
     const total = innerPayload.length;
     const nChunks = Math.max(1, Math.ceil(total / chunkSize));
-    log('tx',`[Ripley] ${total}B → ${nChunks} segments (chunkSize=${chunkSize})`);
     for (let i = 0; i < nChunks; i++) {
       const isLast = i === nChunks - 1;
       const hdr  = (i << 1) | (isLast ? 1 : 0);
       const chunk = innerPayload.slice(i * chunkSize, (i + 1) * chunkSize);
-      const pkt   = new Uint8Array([hdr, ...chunk]);
-      log('tx',`[Ripley] seg${i}/${nChunks-1} ${b2h(pkt)}`);
-      await this.wChar.writeValueWithoutResponse(pkt);
-      if (!isLast) await sleep(15); // small gap between segments for BLE stability
+      await this.wChar.writeValueWithoutResponse(new Uint8Array([hdr, ...chunk]));
+      if (!isLast) await sleep(15);
     }
   }
 
@@ -1634,72 +1757,63 @@ class NikeShoe {
     }
   }
 
+  // Incoming notification: de-Ripley → de-frame → match pending request / dispatch event.
   _notify(e) {
-    const b = new Uint8Array(e.target.value.buffer);
-    const ascii = Array.from(b).map(x=>x>=32&&x<127?String.fromCharCode(x):'.').join('');
-    log('rx',`[${this.label}] ← ${b2h(b)}  "${ascii}"`);
+    const pkt = new Uint8Array(e.target.value.buffer);
+    if (pkt.length === 0) return;
+    const hdr = pkt[0];
 
-    // Resolve auth challenge promise on ANY notification (not just C0)
-    // This lets us detect what the shoe sends after opcode-01 probes
+    // legacy probe/DH paths still listen on _challengeResolve (raw packet)
     if (this._challengeResolve) {
-      this._challengeResolve({ opcode: b[0], second: b[1], data: b });
+      this._challengeResolve({ opcode: pkt[0], second: pkt[1], data: pkt });
       this._challengeResolve = null;
     }
 
-    if (b[0] === 0xC0) {
-      this._currentFit = b[1];
-      if (!this._authOK) {
-        // handled by _challengeResolve above
-      } else {
-        log('rx', `[${this.label}] C0 keepalive — position: ${b[1]}`);
-      }
-    } else if (b[0] === 0xFE) {
-      if (b[1] === 0x00) {
-        this._authOK = true;
-        log('rx', `[${this.label}] ✅ AUTH OK (FE 00) !`);
-        toast(`✅ ${this.label} auth OK!`);
-      } else if (b[1] === 0x02) {
-        log('rx', `[${this.label}] ✗ FE 02 NACK — clé invalide`);
-      } else {
-        log('rx', `[${this.label}] FE ${b[1].toString(16).padStart(2,'0').toUpperCase()} (${b.length} bytes)`);
-      }
-    } else if (b[0] === 0xE8) {
-      if (b[1] === 0x00) {
-        log('rx', `[${this.label}] ✅ Tighten ACK`);
-      } else {
-        log('rx', `[${this.label}] E8 ${b[1].toString(16).padStart(2,'0').toUpperCase()} — tighten NACK/réponse`);
-      }
-    } else if (b[0] === 0xE3 || b[0] === 0x03) {
-      this.battery = b[1]; updateBattUI(this.side, this.battery);
-      log('rx', `[${this.label}] Batterie: ${b[1]}%`);
+    // Ripley flow-control / keepalive packet (bit 0x40 set) — e.g. the shoe's "C0 xx"
+    if (hdr & 0x40) { log('rx', `[${this.label}] ⟲ ${b2h(pkt)}`); return; }
+
+    // Ripley data segment: strip the 1-byte header, accumulate until the 0x80 segment
+    if (!this._rx) this._rx = [];
+    for (let i = 1; i < pkt.length; i++) this._rx.push(pkt[i]);
+    if (!(hdr & 0x80)) return;                       // more segments to come
+    const full = new Uint8Array(this._rx); this._rx = [];
+
+    const msg = corerfParse(full);
+    if (!msg) { log('rx', `[${this.label}] ← (illisible) ${b2h(full)}`); return; }
+    const tName = ['REQ', 'ACK', 'NAK', 'EVT'][msg.msgType] || '?';
+    log('rx', `[${this.label}] ← op=0x${msg.opcode.toString(16).padStart(2, '0')} ${tName} ${b2h(msg.payload)}`);
+
+    // resolve a pending request whose opcode matches
+    if (this._pending && this._pending.opcode === msg.opcode && (msg.msgType === MT.ACK || msg.msgType === MT.NAK)) {
+      const r = this._pending.resolve; this._pending = null; r(msg); return;
+    }
+    // otherwise it's an unsolicited EVENT
+    this._dispatchEvent(msg);
+  }
+
+  _dispatchEvent(msg) {
+    if (msg.opcode === OP.BATTERY_CHARGER_STATE_GET) {
+      const pct = (pbDecode(msg.payload)[4] || {}).val;            // BatteryChargerState.batteryPercent
+      if (pct != null) { this.battery = pct; updateBattUI(this.side, pct); log('rx', `[${this.label}] Batt: ${pct}%`); }
+    } else if (msg.opcode === OP.SERVO_MOVE_COMPLETE_EVENT) {
+      const pos = (pbDecode(msg.payload)[2] || {}).val;            // ServoStatusEvent.positionPercentage
+      if (pos != null) { this._currentFit = pos; log('rx', `[${this.label}] Servo done @ ${pos}%`); }
     }
   }
 
-  _startKeepalive() {
-    if (this._kaTimer) return;
-    const keyBytes = h2b(SHOE_DATA[this.side].authKey);
-    const authBytes = new Uint8Array([0x01, 0x10, ...keyBytes]);
-    this._kaTimer = setInterval(async () => {
-      if (!this.device?.gatt?.connected || !this.wChar) {
-        clearInterval(this._kaTimer); this._kaTimer = null; return;
-      }
-      // Only re-send step1 once auth is confirmed — avoid interfering with probe
-      if (!this._authOK) return;
-      try { await this._write(authBytes); } catch {}
-    }, 4000);
-  }
+  // The shoe sends its own Ripley keepalives (~every 3 s) and the BLE link layer
+  // keeps the connection alive, so no app-level keepalive write is needed.
+  _startKeepalive() { /* intentionally no-op */ }
 
   _disc() {
-    this.connected=false; this.wChar=this.nChar=null; this._authOK=false;
-    this._dhRunning=false; this._stopProbes=false;
-    if (this._kaTimer) { clearInterval(this._kaTimer); this._kaTimer=null; }
-    setShoeUI(this.side,'off',null);
-    updateBattUI(this.side,null);
-    log('info',`[${this.label}] Déconnecté`);
+    this.connected = false; this.wChar = this.nChar = null; this._authOK = false;
+    this._dhRunning = false; this._stopProbes = false;
+    this._seq = 0; this._rx = []; this._pending = null;
+    if (this._kaTimer) { clearInterval(this._kaTimer); this._kaTimer = null; }
+    setShoeUI(this.side, 'off', null);
+    updateBattUI(this.side, null);
+    log('info', `[${this.label}] Déconnecté`);
     toast(`${this.label} déconnectée`);
-    const next = STEP2_PROBES[step2ProbeIndex % STEP2_PROBES.length];
-    log('info',`Prochain probe: #${step2ProbeIndex} "${next.label}"`);
-    updateProbeStatus();
   }
 
   async disconnect() {
@@ -2000,7 +2114,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v38 — step2 probe #${step2ProbeIndex}/${STEP2_PROBES.length} (${SHOE_DATA.left.authKey ? '✓' : '⚠'} clés)`);
+  log('info', `App version: v39 — auth CoreRF challenge-response (clés ${SHOE_DATA.left.authKey ? '✓' : '⚠'})`);
 }
 
 init();
