@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v46</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v47</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -1079,10 +1079,9 @@ class NikeShoe {
     for (let attempt = 1; attempt <= 4 && !this.server; attempt++) {
       try { this.server = await this.device.gatt.connect(); }
       catch (e) {
-        const d = `${e?.name||''} ${e?.message ?? e}`.trim();
-        log('info', `[${this.label}] gatt.connect tentative ${attempt}/4 échouée (${d})`);
+        log('info', `[${this.label}] gatt.connect ${attempt}/4 KO — ${errDetail(e)}`);
         if (attempt === 4) throw e;
-        await sleep(1200);
+        await sleep(1500);
       }
     }
     await this._discover();
@@ -1596,14 +1595,25 @@ function setShoeUI(side, state, name) {
 // ════════════════════════════════════
 // Connect
 // ════════════════════════════════════
+function errDetail(e) {
+  if (e == null) return 'null';
+  if (typeof e !== 'object') return `${typeof e}:${String(e)}`;
+  const parts = [];
+  if (e.name) parts.push('name=' + e.name);
+  if (e.message !== undefined && e.message !== '') parts.push('msg=' + e.message);
+  if (e.code !== undefined) parts.push('code=' + e.code);
+  if (e.constructor && e.constructor.name) parts.push('type=' + e.constructor.name);
+  try { for (const k of Object.getOwnPropertyNames(e)) if (!['name','message','code','stack'].includes(k)) parts.push(`${k}=${e[k]}`); } catch {}
+  return parts.length ? parts.join(' ') : String(e);
+}
+
 async function connectShoe(side) {
   if (!navigator.bluetooth) { toast('Utilise Chrome ou Bluefy'); return; }
   try { await shoes[side].connect(); }
   catch(e) {
     if (e?.name !== 'NotFoundError') {
-      const detail = `${e?.name || ''} ${e?.message || (e ?? 'erreur inconnue')}`.trim();
+      const detail = errDetail(e);
       log('err', `Connect [${side}]: ${detail}`);
-      if (e?.stack) log('err', `  ${String(e.stack).split('\n')[1] || ''}`.trim());
       toast(`Erreur: ${detail}`);
     }
     setShoeUI(side,'off',null);
@@ -1767,7 +1777,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v46 — retry de connexion (post-reset)`);
+  log('info', `App version: v47 — log d'erreur de connexion détaillé`);
 }
 
 init();
