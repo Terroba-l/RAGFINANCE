@@ -406,7 +406,7 @@
         <path fill-rule="evenodd" d="M48,0.147L12.863,15.191c-3.787,1.625 -9.716,3.487 -12.19,-0.55C-0.712,12.404 0.16,8.924 2.197,5.746 3.494,3.73 5.155,1.853 6.822,0c-0.925,1.522 -3.535,6.606 -0.117,9.153 1.333,0.971 3.673,1.067 6.577,0.3L48,0.148z"/>
       </svg>
       <span style="font-size:0.6rem;font-weight:700;letter-spacing:2.5px;color:#fff">ADAPT&nbsp;AUTO&nbsp;MAX</span>
-      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v47</span>
+      <span id="app-version" style="font-size:0.5rem;color:rgba(255,255,255,0.4);letter-spacing:1px">v48</span>
     </div>
 
     <button class="hdr-btn" onclick="openSheet('config')">
@@ -1062,6 +1062,8 @@ class NikeShoe {
         {namePrefix:'Nike Adapt'},
         {namePrefix:'Nike'},
         {namePrefix:'Adapt'},
+        {namePrefix:'004'},      // nom d'usine après reset : 004-CZ6799-001
+        {namePrefix:'CZ6799'},
       ],
       optionalServices:[
         '1A2328AF-3D0B-4B04-A2AA-973C239D3904',
@@ -1151,6 +1153,7 @@ class NikeShoe {
     const out = [
       { name: 'extraite LEFT',  bytes: h2b(SHOE_DATA.left.authKey)  },
       { name: 'extraite RIGHT', bytes: h2b(SHOE_DATA.right.authKey) },
+      { name: 'défaut (01×16)', bytes: new Uint8Array(16).fill(1) },   // chaussure dé-imprintée (post-reset)
     ];
     try {
       const saved = JSON.parse(localStorage.getItem('imprintedKeys') || '{}');
@@ -1159,68 +1162,53 @@ class NikeShoe {
     return out;
   }
 
+  // Auth par connexion : la chaussure vérifie AES-128-ECB(authKey, deviceNonce).
+  // ⚠️ Le firmware IGNORE encryptedPhoneNonce (xa.q ne lit que deviceNonce=champ 2).
+  // On ne pré-filtre donc PAS les clés par lui (fausse piste qui masquait la clé qui
+  // marche) : on envoie le VRAI challenge pour chaque clé candidate, fresh
+  // START_AUTHENTICATION (nouveau deviceNonce) à chaque essai, et on garde celle que
+  // la chaussure ACK. (Validé en direct sur le hardware via ble/nike.py `trykeys`.)
   async _auth() {
     this._authOK = false; this._authKey = null; this._noKeyMatch = false;
     const dev = this.device?.name || this.label;
+    const candidates = [...(this._imprintCandidates || []), ...this._candidateKeys()];
 
-    // 1+2 — send our random phoneNonce
-    const phoneNonce = crypto.getRandomValues(new Uint8Array(16));
-    log('tx', `[${dev}] START_AUTHENTICATION phoneNonce=${b2h(phoneNonce)}`);
-    const ackPayload = await this._sendMessage(
-      OP.START_AUTHENTICATION, MT.REQUEST, new Uint8Array(pbBytes(1, phoneNonce)), { timeout: 6000 });
-    if (ackPayload == null) { log('err', `[${dev}] Auth: pas de réponse à START_AUTHENTICATION`); return false; }
-
-    // 3 — StartAuthenticationACK { encryptedPhoneNonce=1, deviceNonce=2 }
-    const ack = pbDecode(ackPayload);
-    const encPhoneNonce = ack[1] && ack[1].bytes;
-    const deviceNonce   = ack[2] && ack[2].bytes;
-    if (!deviceNonce || deviceNonce.length !== 16) {
-      log('err', `[${dev}] Auth: deviceNonce invalide (${ackPayload.length}B)`); return false;
-    }
-    log('rx', `[${dev}] deviceNonce=${b2h(deviceNonce)}`);
-
-    // 3b — identify which key the shoe is really using, by matching its
-    //      encryptedPhoneNonce = AES(realKey, phoneNonce) against our candidates
-    //      (freshly-imprinted candidates first, then saved + factory-extracted keys).
-    let matched = null;
-    if (encPhoneNonce && encPhoneNonce.length === 16) {
-      for (const c of [...(this._imprintCandidates || []), ...this._candidateKeys()]) {
-        if (bytesEq(await aesEcb(c.bytes, phoneNonce), encPhoneNonce)) { matched = c; break; }
+    for (const c of candidates) {
+      // 1 — fresh phoneNonce → START_AUTHENTICATION → deviceNonce (field 2)
+      const phoneNonce = crypto.getRandomValues(new Uint8Array(16));
+      const ackPayload = await this._sendMessage(
+        OP.START_AUTHENTICATION, MT.REQUEST, new Uint8Array(pbBytes(1, phoneNonce)), { timeout: 6000 });
+      if (ackPayload == null) { log('err', `[${dev}] Auth: pas de réponse à START_AUTHENTICATION`); return false; }
+      const deviceNonce = (pbDecode(ackPayload)[2] || {}).bytes;
+      if (!deviceNonce || deviceNonce.length !== 16) {
+        log('err', `[${dev}] Auth: deviceNonce invalide (${ackPayload.length}B)`); return false;
       }
-    }
 
-    if (!matched) {
-      this._noKeyMatch = true;
-      log('err', `[${dev}] ⚠️ Aucune clé connue ne correspond — clé périmée. → tentative d'imprint…`);
-      return false;   // connect() will try imprint() (single key-gen there)
-    }
+      // 2 — répondre le challenge avec CETTE clé : AES-128-ECB(clé, deviceNonce)
+      const encDeviceNonce = await aesEcb(c.bytes, deviceNonce);
+      const res = await this._sendMessage(
+        OP.AUTHENTICATION_CHALLENGE, MT.REQUEST, new Uint8Array(pbBytes(1, encDeviceNonce)), { timeout: 6000 });
 
-    const authKey = matched.bytes;
-    log('rx', `[${dev}] 🔑 Clé reconnue: ${matched.name}`);
-
-    // 4 — answer the challenge: AES-128-ECB(authKey, deviceNonce)
-    const encDeviceNonce = await aesEcb(authKey, deviceNonce);
-    log('tx', `[${dev}] AUTHENTICATION_CHALLENGE enc=${b2h(encDeviceNonce)}`);
-    const res = await this._sendMessage(
-      OP.AUTHENTICATION_CHALLENGE, MT.REQUEST, new Uint8Array(pbBytes(1, encDeviceNonce)), { timeout: 6000 });
-
-    if (res != null) {
-      this._authOK = true; this._authKey = authKey; this._imprintCandidates = null;
-      // persist a freshly imprinted key under the device name, for future connections
-      if (this.device?.name && /imprint/i.test(matched.name)) {
-        try {
-          const s = JSON.parse(localStorage.getItem('imprintedKeys') || '{}');
-          s[this.device.name] = b2h(authKey).replace(/ /g, '').toLowerCase();
-          localStorage.setItem('imprintedKeys', JSON.stringify(s));
-          log('info', `[${dev}] 💾 Clé imprintée sauvegardée`);
-        } catch {}
+      if (res != null) {
+        this._authOK = true; this._authKey = c.bytes; this._imprintCandidates = null;
+        if (this.device?.name && /imprint/i.test(c.name)) {
+          try {
+            const s = JSON.parse(localStorage.getItem('imprintedKeys') || '{}');
+            s[this.device.name] = b2h(c.bytes).replace(/ /g, '').toLowerCase();
+            localStorage.setItem('imprintedKeys', JSON.stringify(s));
+            log('info', `[${dev}] 💾 Clé imprintée sauvegardée`);
+          } catch {}
+        }
+        log('rx', `[${dev}] ✅ AUTH OK (${c.name})`);
+        toast(`✅ ${this.label} authentifiée`);
+        return true;
       }
-      log('rx', `[${dev}] ✅ AUTH OK (${matched.name})`);
-      toast(`✅ ${this.label} authentifiée`);
-      return true;
+      log('info', `[${dev}] clé « ${c.name} » refusée, essai suivant…`);
     }
-    log('err', `[${dev}] ✗ Challenge refusé (NAK)`);
-    return false;
+
+    this._noKeyMatch = true;
+    log('err', `[${dev}] ⚠️ Aucune clé acceptée — → tentative d'imprint…`);
+    return false;   // connect() will try imprint()
   }
 
   // (Re)imprint: establish a NEW shared key via Diffie-Hellman, then authenticate.
@@ -1777,7 +1765,7 @@ function init() {
     }).catch(()=>{});
   }
 
-  log('info', `App version: v47 — log d'erreur de connexion détaillé`);
+  log('info', `App version: v48 — reset→004-CZ6799-001, auth clé défaut, challenge direct`);
 }
 
 init();
